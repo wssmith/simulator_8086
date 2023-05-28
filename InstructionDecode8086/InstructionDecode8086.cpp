@@ -28,8 +28,13 @@ namespace
         uint8_t mod = 0;
         uint8_t reg = 0;
         uint8_t rm = 0;
+        uint8_t sr = 0;
         uint8_t disp_lo = 0;
         uint8_t disp_hi = 0;
+        uint8_t data_lo = 0;
+        uint8_t data_hi = 0;
+        uint8_t addr_lo = 0;
+        uint8_t addr_hi = 0;
         bool d = false;
         bool w = false;
     };
@@ -58,7 +63,7 @@ namespace
         { opcode::mov_from_segment_register, mov_name },
     };
 
-    opcode determine_opcode(uint8_t b)
+    opcode read_opcode(uint8_t b)
     {
         switch (b >> 4)
         {
@@ -95,6 +100,41 @@ namespace
 
         return opcode::none;
     }
+
+    int get_displacement_bytes(uint8_t mod, uint8_t rm)
+    {
+        switch (mod)
+        {
+        case 0b00: // memory mode, no displacement unless direct address
+            return (rm == 0b110) * 2;
+        case 0b01: // memory mode, 8-bit displacement
+            return 1;
+        case 0b10: // memory mode, 16-bit displacement
+            return 2;
+        case 0b11: // register mode, no displacement
+        default:
+            return 0;
+        }
+    }
+
+    void read_displacement(std::ifstream& input_file, instruction& inst)
+    {
+        const int displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
+
+        if (displacement_bytes > 0)
+        {
+            input_file >> inst.disp_lo;
+            if (displacement_bytes > 1)
+                input_file >> inst.disp_hi;
+        }
+    }
+
+    void read_data(std::ifstream& input_file, instruction& inst)
+    {
+        input_file >> inst.data_lo;
+        if (inst.w)
+            input_file >> inst.data_hi;
+    }
 }
 
 int main()
@@ -110,9 +150,9 @@ int main()
     {
         instruction inst{};
 
-        const opcode opcode = determine_opcode(b);
+        inst.opcode = read_opcode(b);
 
-        switch (opcode)
+        switch (inst.opcode)
         {
         case opcode::mov_normal:
         {
@@ -120,57 +160,73 @@ int main()
             b >>= 1;
             inst.d = b & 1;
             b >>= 1;
-            inst.opcode = opcode;
 
             input_file >> b;
-
             inst.rm = b & 0b0111;
             b >>= 3;
             inst.reg = b & 0b0111;
             b >>= 3;
             inst.mod = b;
 
-            int displacement_bytes = 0;
-            switch (inst.mod)
-            {
-            case 0b00: // memory mode, no displacement unless direct address
-                displacement_bytes = (inst.rm == 0b110) * 2;
-                break;
-            case 0b01: // memory mode, 8-bit displacement
-                displacement_bytes = 1;
-                break;
-            case 0b10: // memory mode, 16-bit displacement
-                displacement_bytes = 2;
-                break;
-            case 0b11: // register mode, no displacement
-                break;
-            }
-
-            // read displacement
-            if (displacement_bytes > 0)
-            {
-                input_file >> inst.disp_lo;
-
-                if (displacement_bytes > 1)
-                    input_file >> inst.disp_hi;
-            }
+            read_displacement(input_file, inst);
 
             break;
         }
 
         case opcode::mov_immediate_to_register_or_memory:
+        {
+            inst.w = b & 1;
+
+            input_file >> b;
+            inst.rm = b & 0b0111;
+            b >>= 6;
+            inst.mod = b;
+
+            read_displacement(input_file, inst);
+            read_data(input_file, inst);
+
             break;
+        }
 
         case opcode::mov_immediate_to_register:
+        {
+            inst.reg = b & 0b111;
+            b >>= 3;
+            inst.w = b & 1;
+
+            read_data(input_file, inst);
+
             break;
+        }
 
         case opcode::mov_memory_to_accumulator:
         case opcode::mov_accumulator_to_memory:
+        {
+            inst.w = b & 1;
+
+            input_file >> inst.addr_lo;
+            if (inst.w)
+                input_file >> inst.addr_hi;
+
             break;
+        }
 
         case opcode::mov_to_segment_register:
         case opcode::mov_from_segment_register:
+        {
+            input_file >> b;
+
+            input_file >> b;
+            inst.rm = b & 0b0111;
+            b >>= 3;
+            inst.sr = b & 0b011;
+            b >>= 3;
+            inst.mod = b;
+
+            read_displacement(input_file, inst);
+
             break;
+        }
 
         case opcode::none:
             break;
