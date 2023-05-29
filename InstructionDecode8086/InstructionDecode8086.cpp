@@ -1,9 +1,12 @@
 // InstructionDecode8086.cpp
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
-#include <iostream>
 #include <fstream>
+#include <ios>
+#include <iostream>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -63,39 +66,53 @@ namespace
         { opcode::mov_from_segment_register, mov_name },
     };
 
+    std::vector<uint8_t> read_binary_file(const std::string& path)
+    {
+        std::ifstream input_file{ path, std::ios::in | std::ios::binary };
+
+        std::vector<uint8_t> data;
+        std::for_each(std::istreambuf_iterator<char>(input_file),
+                      std::istreambuf_iterator<char>(),
+                      [&data](char c)
+                      {
+                          data.push_back(c);
+                      });
+
+        return data;
+    }
+
     opcode read_opcode(uint8_t b)
     {
         switch (b >> 4)
         {
-        case 0b1000:
-        {
-            const uint8_t second_half = b & 0b1111;
-            switch (second_half)
+            case 0b1000:
             {
-            case 0b1110:
-                return opcode::mov_to_segment_register;
-            case 0b1100:
-                return opcode::mov_from_segment_register;
-            default:
-                if ((second_half & 0b1100) == 0b1000)
-                    return opcode::mov_normal;
+                switch (const uint8_t second_half = b & 0b1111)
+                {
+                    case 0b1110:
+                        return opcode::mov_to_segment_register;
+                    case 0b1100:
+                        return opcode::mov_from_segment_register;
+                    default:
+                        if ((second_half & 0b1100) == 0b1000)
+                            return opcode::mov_normal;
+                        break;
+                }
                 break;
             }
-            break;
-        }
-        case 0b1100:
-            return opcode::mov_immediate_to_register_or_memory;
-        case 0b1011:
-            return opcode::mov_immediate_to_register;
-        case 0b1010:
-            switch (b & 0b1110)
-            {
-            case 0b0000:
-                return opcode::mov_memory_to_accumulator;
-            case 0b0010:
-                return opcode::mov_accumulator_to_memory;
-            }
-            break;
+            case 0b1100:
+                return opcode::mov_immediate_to_register_or_memory;
+            case 0b1011:
+                return opcode::mov_immediate_to_register;
+            case 0b1010:
+                switch (b & 0b1110)
+                {
+                    case 0b0000:
+                        return opcode::mov_memory_to_accumulator;
+                    case 0b0010:
+                        return opcode::mov_accumulator_to_memory;
+                }
+                break;
         }
 
         return opcode::none;
@@ -105,201 +122,291 @@ namespace
     {
         switch (mod)
         {
-        case 0b00: // memory mode, no displacement unless direct address
-            return (rm == 0b110) * 2;
-        case 0b01: // memory mode, 8-bit displacement
-            return 1;
-        case 0b10: // memory mode, 16-bit displacement
-            return 2;
-        case 0b11: // register mode, no displacement
-        default:
-            return 0;
+            case 0b00: // memory mode, no displacement unless direct address
+                return (rm == 0b110) * 2;
+            case 0b01: // memory mode, 8-bit displacement
+                return 1;
+            case 0b10: // memory mode, 16-bit displacement
+                return 2;
+            case 0b11: // register mode, no displacement
+            default:
+                return 0;
         }
     }
 
-    void read_displacement(std::ifstream& input_file, instruction& inst)
+    using data_iterator = std::vector<uint8_t>::const_iterator;
+
+    bool read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
+    {
+        b = *iter++;
+        return iter < iter_end;
+    }
+
+    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
     {
         const int displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
 
         if (displacement_bytes > 0)
         {
-            input_file >> inst.disp_lo;
+            if (!read_and_advance(iter, iter_end, inst.disp_lo))
+                return {};
+
             if (displacement_bytes > 1)
-                input_file >> inst.disp_hi;
+            {
+                if (!read_and_advance(iter, iter_end, inst.disp_hi))
+                    return {};
+            }
         }
+
+        return iter < iter_end;
     }
 
-    void read_data(std::ifstream& input_file, instruction& inst)
+    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
     {
-        input_file >> inst.data_lo;
+        if (!read_and_advance(iter, iter_end, inst.data_lo))
+            return {};
+
         if (inst.w)
-            input_file >> inst.data_hi;
+        {
+            if (!read_and_advance(iter, iter_end, inst.data_hi))
+                return {};
+        }
+
+        return iter < iter_end;
     }
-}
 
-int main()
-{
-    // open binary file
-    std::ifstream input_file{ R"(C:\Users\Wesley\Desktop\listing_0038_many_register_mov)" };
-
-    // read instructions from file
-    std::vector<instruction> instructions;
-
-    uint8_t b;
-    while (input_file >> b)
+    std::optional<instruction> read_instruction(data_iterator& data_iter, const data_iterator& data_end)
     {
         instruction inst{};
+
+        uint8_t b = 0;
+        if (!read_and_advance(data_iter, data_end, b))
+            return {};
 
         inst.opcode = read_opcode(b);
 
         switch (inst.opcode)
         {
-        case opcode::mov_normal:
-        {
-            inst.w = b & 1;
-            b >>= 1;
-            inst.d = b & 1;
-            b >>= 1;
+            case opcode::mov_normal:
+            {
+                inst.w = b & 1;
+                b >>= 1;
+                inst.d = b & 1;
 
-            input_file >> b;
-            inst.rm = b & 0b0111;
-            b >>= 3;
-            inst.reg = b & 0b0111;
-            b >>= 3;
-            inst.mod = b;
+                if (!read_and_advance(data_iter, data_end, b))
+                    return {};
 
-            read_displacement(input_file, inst);
+                inst.rm = b & 0b0111;
+                b >>= 3;
+                inst.reg = b & 0b0111;
+                b >>= 3;
+                inst.mod = b;
 
-            break;
+                if (!read_displacement(data_iter, data_end, inst))
+                    return {};
+
+                break;
+            }
+
+            case opcode::mov_immediate_to_register_or_memory:
+            {
+                inst.w = b & 1;
+
+                if (!read_and_advance(data_iter, data_end, b))
+                    return {};
+
+                inst.rm = b & 0b0111;
+                b >>= 6;
+                inst.mod = b;
+
+                if (!read_displacement(data_iter, data_end, inst))
+                    return {};
+                if (!read_data(data_iter, data_end, inst))
+                    return {};
+
+                break;
+            }
+
+            case opcode::mov_immediate_to_register:
+            {
+                inst.reg = b & 0b111;
+                b >>= 3;
+                inst.w = b & 1;
+
+                if (!read_data(data_iter, data_end, inst))
+                    return {};
+
+                break;
+            }
+
+            case opcode::mov_memory_to_accumulator:
+            case opcode::mov_accumulator_to_memory:
+            {
+                inst.w = b & 1;
+
+                if (!read_and_advance(data_iter, data_end, b))
+                    return {};
+
+                inst.addr_lo = b;
+                if (inst.w)
+                {
+                    if (!read_and_advance(data_iter, data_end, b))
+                        return {};
+
+                    inst.addr_hi = b;
+                }
+                break;
+            }
+
+            case opcode::mov_to_segment_register:
+            case opcode::mov_from_segment_register:
+            {
+                if (!read_and_advance(data_iter, data_end, b)) 
+                    return {};
+
+                inst.rm = b & 0b0111;
+                b >>= 3;
+                inst.sr = b & 0b011;
+                b >>= 3;
+                inst.mod = b;
+
+                if (!read_displacement(data_iter, data_end, inst))
+                    return {};
+
+                break;
+            }
+
+            case opcode::none:
+                break;
         }
 
-        case opcode::mov_immediate_to_register_or_memory:
-        {
-            inst.w = b & 1;
+        return inst;
+    }
+}
 
-            input_file >> b;
-            inst.rm = b & 0b0111;
-            b >>= 6;
-            inst.mod = b;
+int main()
+{
+    // read binary file
+    std::vector<uint8_t> data = read_binary_file(R"(C:\Users\Wesley\Desktop\listing_0039_more_movs)");
 
-            read_displacement(input_file, inst);
-            read_data(input_file, inst);
+    // read instructions
+    std::vector<instruction> instructions;
+    auto data_iter = data.cbegin();
+    auto data_end = data.cend();
 
-            break;
-        }
-
-        case opcode::mov_immediate_to_register:
-        {
-            inst.reg = b & 0b111;
-            b >>= 3;
-            inst.w = b & 1;
-
-            read_data(input_file, inst);
-
-            break;
-        }
-
-        case opcode::mov_memory_to_accumulator:
-        case opcode::mov_accumulator_to_memory:
-        {
-            inst.w = b & 1;
-
-            input_file >> inst.addr_lo;
-            if (inst.w)
-                input_file >> inst.addr_hi;
-
-            break;
-        }
-
-        case opcode::mov_to_segment_register:
-        case opcode::mov_from_segment_register:
-        {
-            input_file >> b;
-
-            input_file >> b;
-            inst.rm = b & 0b0111;
-            b >>= 3;
-            inst.sr = b & 0b011;
-            b >>= 3;
-            inst.mod = b;
-
-            read_displacement(input_file, inst);
-
-            break;
-        }
-
-        case opcode::none:
-            break;
-        }
-
-        instructions.push_back(inst);
+    while (data_iter < data_end - 1)
+    {
+        std::optional<instruction> result = read_instruction(data_iter, data_end);
+        if (result.has_value())
+            instructions.push_back(result.value());
     }
 
-    // decode instruction and print asm
+    // decode instructions and print assembly
     for (auto& inst : instructions)
     {
         const char* opcode = opcodes[inst.opcode];
 
-        std::string source_name;
-        std::string destination_name;
+        std::string source;
+        std::string destination;
 
         switch (inst.opcode)
         {
-        case opcode::mov_normal:
+            case opcode::mov_normal:
             {
                 if (inst.mod == 0b11)
                 {
                     // register mode
                     if (inst.d)
                     {
-                        source_name = registers[inst.rm + 8 * inst.w];
-                        destination_name = registers[inst.reg + 8 * inst.w];
+                        source = registers[inst.rm + 8 * inst.w];
+                        destination = registers[inst.reg + 8 * inst.w];
                     }
                     else
                     {
-                        source_name = registers[inst.reg + 8 * inst.w];
-                        destination_name = registers[inst.rm + 8 * inst.w];
+                        source = registers[inst.reg + 8 * inst.w];
+                        destination = registers[inst.rm + 8 * inst.w];
                     }
                 }
                 else
                 {
                     std::string address = effective_addresses[inst.rm];
 
-                    // memory mode, 8-bit displacement
-                    if (inst.mod == 0b01)
-                        address += " + " + std::to_string(inst.disp_lo);
-
-                    // memory mode, 16-bit displacement
-                    if (inst.mod == 0b10)
-                        address += " + " + std::to_string((inst.disp_hi << 8) + inst.disp_lo);
-
-                    if (inst.mod == 0b00 && inst.rm == 0b110)
+                    switch (inst.mod)
                     {
-                        // direct address
-                        // todo
+                        case 0b00:
+                        {
+                            if (inst.rm == 0b110)
+                            {
+                                // direct address
+                                // todo
+                            }
+                            break;
+                        }
+                        case 0b01: // memory mode, 8-bit displacement
+                        {
+                            if (inst.disp_lo != 0)
+                                address += " + " + std::to_string(inst.disp_lo);
+                            break;
+                        }
+                        case 0b10: // memory mode, 16-bit displacement
+                        {
+                            int displacement = (inst.disp_hi << 8) + inst.disp_lo;
+                            if (displacement != 0)
+                                address += " + " + std::to_string((inst.disp_hi << 8) + inst.disp_lo);
+                            break;
+                        }
                     }
 
                     if (inst.d)
                     {
-                        source_name = "[" + address + "]";
-                        destination_name = registers[inst.reg + 8 * inst.w];
+                        source = "[" + address + "]";
+                        destination = registers[inst.reg + 8 * inst.w];
                     }
                     else
                     {
-                        source_name = registers[inst.reg + 8 * inst.w];
-                        destination_name = "[" + address + "]";
+                        source = registers[inst.reg + 8 * inst.w];
+                        destination = "[" + address + "]";
                     }
                 }
             }
-        case opcode::mov_immediate_to_register_or_memory: break;
-        case opcode::mov_immediate_to_register: break;
-        case opcode::mov_memory_to_accumulator: break;
-        case opcode::mov_accumulator_to_memory: break;
-        case opcode::mov_to_segment_register: break;
-        case opcode::mov_from_segment_register: break;
-        case opcode::none: break;
+
+            case opcode::mov_immediate_to_register_or_memory:
+            {
+                break;
+            }
+
+            case opcode::mov_immediate_to_register:
+            {
+                int16_t source_data = 0;
+                if (inst.w)
+                    source_data = static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8));
+                else
+                    source_data = static_cast<int8_t>(inst.data_lo);
+
+                source = std::to_string(source_data);
+
+                destination = registers[inst.reg + 8 * inst.w];
+                break;
+            }
+
+            case opcode::mov_memory_to_accumulator:
+            {
+                break;
+            }
+
+            case opcode::mov_accumulator_to_memory:
+            {
+                break;
+            }
+
+            case opcode::mov_to_segment_register:
+            case opcode::mov_from_segment_register:
+                break;
+
+            case opcode::none:
+                break;
         }
 
-        std::cout << opcode << ' ' << destination_name << ", " << source_name << '\n';
+        std::cout << opcode << ' ' << destination << ", " << source << '\n';
     }
 }
