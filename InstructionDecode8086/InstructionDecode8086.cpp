@@ -317,7 +317,7 @@ namespace
         }
     }
 
-    std::string get_memory_address(const instruction& inst)
+    std::string get_instruction_memory(const instruction& inst)
     {
         std::string address;
 
@@ -359,30 +359,11 @@ namespace
 
         return "[" + address + "]";
     }
-}
 
-int main()
-{
-    // read binary file
-    std::vector<uint8_t> data = read_binary_file(R"(C:\Users\Wesley\Desktop\listing_0040_challenge_movs)");
+    using instruction_parts = std::tuple<std::string, std::string, std::string>;
 
-    // read instructions
-    std::vector<instruction> instructions;
-    auto data_iter = data.cbegin();
-    auto data_end = data.cend();
-
-    while (data_iter != data_end)
+    instruction_parts decode_instruction(instruction& inst)
     {
-        std::optional<instruction> result = read_instruction(data_iter, data_end);
-        if (result.has_value())
-            instructions.push_back(result.value());
-    }
-
-    // decode instructions and print assembly
-    for (auto& inst : instructions)
-    {
-        const char* opcode = opcodes[inst.opcode];
-
         std::string source;
         std::string destination;
 
@@ -397,7 +378,7 @@ int main()
                 }
                 else // memory mode
                 {
-                    std::string address = get_memory_address(inst);
+                    std::string address = get_instruction_memory(inst);
                     source = inst.d ? address : registers[inst.reg + 8 * inst.w];
                     destination = inst.d ? registers[inst.reg + 8 * inst.w] : address;
                 }
@@ -413,7 +394,7 @@ int main()
                 }
                 else // memory mode
                 {
-                    destination = get_memory_address(inst);
+                    destination = get_instruction_memory(inst);
                     source = (inst.w ? "word " : "byte ") + get_instruction_data(inst);
                 }
                 break;
@@ -442,12 +423,59 @@ int main()
 
             case opcode::mov_to_segment_register:
             case opcode::mov_from_segment_register:
+                // todo
                 break;
 
             case opcode::none:
                 break;
         }
 
-        std::cout << opcode << ' ' << destination << ", " << source << '\n';
+        return { opcodes[inst.opcode], source, destination };
+    }
+}
+
+int main(int argc, char* argv[])
+{
+    constexpr int expected_args = 2;
+    if (argc != expected_args)
+    {
+        std::cout << "Usage: InstructionDecode8086 input_file\n";
+        return 1;
+    }
+
+    try
+    {
+        // read binary file
+        const char* input_path = argv[1];
+        const std::vector<uint8_t> data = read_binary_file(input_path);
+
+        // read instructions
+        std::vector<instruction> instructions;
+        auto data_iter = data.cbegin();
+        const auto data_end = data.cend();
+
+        while (data_iter != data_end)
+        {
+            std::optional<instruction> result = read_instruction(data_iter, data_end);
+
+            if (result.has_value())
+                instructions.push_back(result.value());
+        }
+
+        // decode instructions and print assembly
+        for (instruction& inst : instructions)
+        {
+            auto [opcode, source, destination] = decode_instruction(inst);
+
+            std::cout << opcode << ' ' << destination << ", " << source << '\n';
+        }
+    }
+    catch (std::exception& ex)
+    {
+        std::cout << "ERROR!! " << ex.what() << '\n';
+    }
+    catch (...)
+    {
+        std::cout << "UNKNOWN ERROR!!\n";
     }
 }
