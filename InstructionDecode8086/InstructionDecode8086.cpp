@@ -118,7 +118,7 @@ namespace
         return opcode::none;
     }
 
-    int get_displacement_bytes(uint8_t mod, uint8_t rm)
+    int8_t get_displacement_bytes(uint8_t mod, uint8_t rm)
     {
         switch (mod)
         {
@@ -138,41 +138,45 @@ namespace
 
     bool read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
     {
+        if (iter == iter_end)
+            return false;
+
         b = *iter++;
-        return iter < iter_end;
+
+        return true;
     }
 
     bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
     {
-        const int displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
+        const int8_t displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
 
         if (displacement_bytes > 0)
         {
             if (!read_and_advance(iter, iter_end, inst.disp_lo))
-                return {};
+                return false;
 
             if (displacement_bytes > 1)
             {
                 if (!read_and_advance(iter, iter_end, inst.disp_hi))
-                    return {};
+                    return false;
             }
         }
 
-        return iter < iter_end;
+        return true;
     }
 
     bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
     {
         if (!read_and_advance(iter, iter_end, inst.data_lo))
-            return {};
+            return false;
 
         if (inst.w)
         {
             if (!read_and_advance(iter, iter_end, inst.data_hi))
-                return {};
+                return false;
         }
 
-        return iter < iter_end;
+        return true;
     }
 
     std::optional<instruction> read_instruction(data_iterator& data_iter, const data_iterator& data_end)
@@ -282,19 +286,92 @@ namespace
 
         return inst;
     }
+
+    std::string get_instruction_data(const instruction& inst)
+    {
+        if (inst.w)
+            return std::to_string(static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8)));
+        else
+            return std::to_string(static_cast<int8_t>(inst.data_lo));
+    }
+
+    std::string get_instruction_address(const instruction& inst)
+    {
+        if (inst.w)
+            return "[" + std::to_string(static_cast<int16_t>(inst.addr_lo + (inst.addr_hi << 8))) + "]";
+        else
+            return "[" + std::to_string(static_cast<int8_t>(inst.addr_lo)) + "]";
+    }
+
+    int16_t get_instruction_displacement(const instruction& inst, int8_t bytes)
+    {
+        switch (bytes)
+        {
+            case 0:
+            default:
+                return 0;
+            case 1:
+                return static_cast<int8_t>(inst.disp_lo);
+            case 2:
+                return static_cast<int16_t>((inst.disp_hi << 8) + inst.disp_lo);
+        }
+    }
+
+    std::string get_memory_address(const instruction& inst)
+    {
+        std::string address;
+
+        int8_t displacement_bytes = 0;
+        bool directAddress = false;
+        switch (inst.mod)
+        {
+            case 0b00: // direct address, 16-bit displacement
+                displacement_bytes = 2;
+                directAddress = (inst.rm == 0b110);
+                break;
+
+            case 0b01: // memory mode, 8-bit displacement
+                displacement_bytes = 1;
+                break;
+
+            case 0b10: // memory mode, 16-bit displacement
+                displacement_bytes = 2;
+                break;
+        }
+
+        const auto displacement = get_instruction_displacement(inst, displacement_bytes);
+
+        if (directAddress)
+        {
+            if (displacement >= 0)
+                address = std::to_string(displacement);
+            else if (displacement < 0)
+                address = std::to_string(-displacement);
+        }
+        else
+        {
+            address = effective_addresses[inst.rm];
+            if (displacement > 0)
+                address += " + " + std::to_string(displacement);
+            else if (displacement < 0)
+                address += " - " + std::to_string(-displacement);
+        }
+
+        return "[" + address + "]";
+    }
 }
 
 int main()
 {
     // read binary file
-    std::vector<uint8_t> data = read_binary_file(R"(C:\Users\Wesley\Desktop\listing_0039_more_movs)");
+    std::vector<uint8_t> data = read_binary_file(R"(C:\Users\Wesley\Desktop\listing_0040_challenge_movs)");
 
     // read instructions
     std::vector<instruction> instructions;
     auto data_iter = data.cbegin();
     auto data_end = data.cend();
 
-    while (data_iter < data_end - 1)
+    while (data_iter != data_end)
     {
         std::optional<instruction> result = read_instruction(data_iter, data_end);
         if (result.has_value())
@@ -313,89 +390,53 @@ int main()
         {
             case opcode::mov_normal:
             {
-                if (inst.mod == 0b11)
+                if (inst.mod == 0b11) // register mode
                 {
-                    // register mode
-                    if (inst.d)
-                    {
-                        source = registers[inst.rm + 8 * inst.w];
-                        destination = registers[inst.reg + 8 * inst.w];
-                    }
-                    else
-                    {
-                        source = registers[inst.reg + 8 * inst.w];
-                        destination = registers[inst.rm + 8 * inst.w];
-                    }
+                    source = registers[(inst.d ? inst.rm : inst.reg) + 8 * inst.w];
+                    destination = registers[(inst.d ? inst.reg : inst.rm) + 8 * inst.w];
                 }
-                else
+                else // memory mode
                 {
-                    std::string address = effective_addresses[inst.rm];
-
-                    switch (inst.mod)
-                    {
-                        case 0b00:
-                        {
-                            if (inst.rm == 0b110)
-                            {
-                                // direct address
-                                // todo
-                            }
-                            break;
-                        }
-                        case 0b01: // memory mode, 8-bit displacement
-                        {
-                            if (inst.disp_lo != 0)
-                                address += " + " + std::to_string(inst.disp_lo);
-                            break;
-                        }
-                        case 0b10: // memory mode, 16-bit displacement
-                        {
-                            int displacement = (inst.disp_hi << 8) + inst.disp_lo;
-                            if (displacement != 0)
-                                address += " + " + std::to_string((inst.disp_hi << 8) + inst.disp_lo);
-                            break;
-                        }
-                    }
-
-                    if (inst.d)
-                    {
-                        source = "[" + address + "]";
-                        destination = registers[inst.reg + 8 * inst.w];
-                    }
-                    else
-                    {
-                        source = registers[inst.reg + 8 * inst.w];
-                        destination = "[" + address + "]";
-                    }
+                    std::string address = get_memory_address(inst);
+                    source = inst.d ? address : registers[inst.reg + 8 * inst.w];
+                    destination = inst.d ? registers[inst.reg + 8 * inst.w] : address;
                 }
+                break;
             }
 
             case opcode::mov_immediate_to_register_or_memory:
             {
+                if (inst.mod == 0b11) // register mode
+                {
+                    destination = registers[inst.rm + 8 * inst.w];
+                    source = get_instruction_data(inst);
+                }
+                else // memory mode
+                {
+                    destination = get_memory_address(inst);
+                    source = (inst.w ? "word " : "byte ") + get_instruction_data(inst);
+                }
                 break;
             }
 
             case opcode::mov_immediate_to_register:
             {
-                int16_t source_data = 0;
-                if (inst.w)
-                    source_data = static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8));
-                else
-                    source_data = static_cast<int8_t>(inst.data_lo);
-
-                source = std::to_string(source_data);
-
                 destination = registers[inst.reg + 8 * inst.w];
+                source = get_instruction_data(inst);
                 break;
             }
 
             case opcode::mov_memory_to_accumulator:
             {
+                destination = registers[inst.w ? 8 : 0];
+                source = get_instruction_address(inst);
                 break;
             }
 
             case opcode::mov_accumulator_to_memory:
             {
+                destination = get_instruction_address(inst);
+                source = registers[inst.w ? 8 : 0];
                 break;
             }
 
