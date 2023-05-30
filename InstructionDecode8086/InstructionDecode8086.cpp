@@ -165,7 +165,7 @@ namespace
         if (!read_and_advance(iter, iter_end, inst.data_lo))
             return false;
 
-        if (inst.w)
+        if (inst.w && !inst.s)
         {
             if (!read_and_advance(iter, iter_end, inst.data_hi))
                 return false;
@@ -210,8 +210,11 @@ namespace
                 break;
             }
 
-            case opcode::mov_immediate_to_register_or_memory:
             case opcode::addsubcmp_immediate:
+                inst.s = (b >> 1) & 1;
+                [[fallthrough]];
+
+            case opcode::mov_immediate_to_register_or_memory:
             {
                 inst.w = b & 1;
 
@@ -219,8 +222,24 @@ namespace
                     return {};
 
                 inst.rm = b & 0b0111;
-                b >>= 6; // todo: extract middle 3 bits and assign actual opcode
+                b >>= 3;
+                uint8_t op = b & 0b0111;
+                b >>= 3;
                 inst.mod = b;
+
+                if (inst.opcode == opcode::addsubcmp_immediate)
+                {
+                    inst.opcode = [&op]
+                    {
+                        switch (op)
+                        {
+                            case 0b000: return opcode::add_immediate_to_register_or_memory;
+                            case 0b101: return opcode::sub_immediate_from_register_or_memory;
+                            case 0b111: return opcode::cmp_immediate_with_register_or_memory;
+                            default:    return opcode::none;
+                        }
+                    }();
+                }
 
                 if (!read_displacement(data_iter, data_end, inst))
                     return {};
@@ -231,9 +250,14 @@ namespace
             }
 
             case opcode::mov_immediate_to_register:
-            {
                 inst.reg = b & 0b111;
                 b >>= 3;
+                [[fallthrough]];
+
+            case opcode::add_immediate_to_accumulator:
+            case opcode::sub_immediate_from_accumulator:
+            case opcode::cmp_immediate_with_accumulator:
+            {
                 inst.w = b & 1;
 
                 if (!read_data(data_iter, data_end, inst))
@@ -244,9 +268,6 @@ namespace
 
             case opcode::mov_memory_to_accumulator:
             case opcode::mov_accumulator_to_memory:
-            case opcode::add_immediate_to_accumulator:
-            case opcode::sub_immediate_from_accumulator:
-            case opcode::cmp_immediate_with_accumulator:
             {
                 inst.w = b & 1;
 
@@ -291,7 +312,7 @@ namespace
 
     std::string get_instruction_data(const instruction& inst)
     {
-        if (inst.w)
+        if (inst.w && !inst.s)
             return std::to_string(static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8)));
         else
             return std::to_string(static_cast<int8_t>(inst.data_lo));
@@ -366,28 +387,34 @@ namespace
 
     instruction_parts decode_instruction(instruction& inst)
     {
-        std::string source;
         std::string destination;
+        std::string source;
 
         switch (inst.opcode)
         {
             case opcode::mov_normal:
+            case opcode::add_normal:
+            case opcode::sub_normal:
+            case opcode::cmp_normal:
             {
                 if (inst.mod == 0b11) // register mode
                 {
-                    source = registers[(inst.d ? inst.rm : inst.reg) + 8 * inst.w];
                     destination = registers[(inst.d ? inst.reg : inst.rm) + 8 * inst.w];
+                    source = registers[(inst.d ? inst.rm : inst.reg) + 8 * inst.w];
                 }
                 else // memory mode
                 {
                     std::string address = get_instruction_memory(inst);
-                    source = inst.d ? address : registers[inst.reg + 8 * inst.w];
                     destination = inst.d ? registers[inst.reg + 8 * inst.w] : address;
+                    source = inst.d ? address : registers[inst.reg + 8 * inst.w];
                 }
                 break;
             }
 
             case opcode::mov_immediate_to_register_or_memory:
+            case opcode::add_immediate_to_register_or_memory:
+            case opcode::sub_immediate_from_register_or_memory:
+            case opcode::cmp_immediate_with_register_or_memory:
             {
                 if (inst.mod == 0b11) // register mode
                 {
@@ -403,6 +430,9 @@ namespace
             }
 
             case opcode::mov_immediate_to_register:
+            case opcode::add_immediate_to_accumulator:
+            case opcode::sub_immediate_from_accumulator:
+            case opcode::cmp_immediate_with_accumulator:
             {
                 destination = registers[inst.reg + 8 * inst.w];
                 source = get_instruction_data(inst);

@@ -20,6 +20,7 @@ struct instruction
     uint8_t addr_hi = 0;
     bool d = false;
     bool w = false;
+    bool s = false;
 };
 
 #endif
