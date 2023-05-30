@@ -12,49 +12,26 @@
 #include <unordered_map>
 #include <vector>
 
+#include "instruction.hpp"
+#include "opcode.hpp"
+
 namespace
 {
-    enum class opcode : uint16_t
-    {
-        none,
-        mov_normal,
-        mov_immediate_to_register_or_memory,
-        mov_immediate_to_register,
-        mov_memory_to_accumulator,
-        mov_accumulator_to_memory,
-        mov_to_segment_register,
-        mov_from_segment_register
-    };
-
-    struct instruction
-    {
-        opcode opcode = opcode::none;
-        uint8_t mod = 0;
-        uint8_t reg = 0;
-        uint8_t rm = 0;
-        uint8_t sr = 0;
-        uint8_t disp_lo = 0;
-        uint8_t disp_hi = 0;
-        uint8_t data_lo = 0;
-        uint8_t data_hi = 0;
-        uint8_t addr_lo = 0;
-        uint8_t addr_hi = 0;
-        bool d = false;
-        bool w = false;
-    };
-
-    constexpr std::array<const char*, 16> registers =
+    constexpr std::array registers =
     {
         "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
         "ax", "cx", "dx", "bx", "sp", "bp", "si", "di"
     };
 
-    constexpr std::array<const char*, 8> effective_addresses =
+    constexpr std::array effective_addresses =
     {
         "bx + si", "bx + di", "bp + si", "bp + di", "si", "di", "bp", "bx"
     };
 
     constexpr const char* mov_name = "mov";
+    constexpr const char* add_name = "add";
+    constexpr const char* sub_name = "sub";
+    constexpr const char* cmp_name = "cmp";
 
     std::unordered_map<opcode, const char*> opcodes
     {
@@ -65,6 +42,47 @@ namespace
         { opcode::mov_accumulator_to_memory, mov_name },
         { opcode::mov_to_segment_register, mov_name },
         { opcode::mov_from_segment_register, mov_name },
+
+        { opcode::add_normal, add_name },
+        { opcode::add_immediate_to_register_or_memory, add_name },
+        { opcode::add_immediate_to_accumulator, add_name },
+
+        { opcode::sub_normal, sub_name },
+        { opcode::sub_immediate_from_register_or_memory, sub_name },
+        { opcode::sub_immediate_from_accumulator, sub_name },
+
+        { opcode::cmp_normal, cmp_name },
+        { opcode::cmp_immediate_with_register_or_memory, cmp_name },
+        { opcode::cmp_immediate_with_accumulator, cmp_name },
+    };
+
+    std::vector<std::unordered_map<uint8_t, opcode>> opcode_maps
+    {
+        {
+            { 0b1000'1110, opcode::mov_to_segment_register },
+            { 0b1000'1100, opcode::mov_from_segment_register },
+        },
+        {
+            { 0b1100'011, opcode::mov_immediate_to_register_or_memory },
+            { 0b1010'000, opcode::mov_memory_to_accumulator },
+            { 0b1010'001, opcode::mov_accumulator_to_memory },
+
+            { 0b0000'010, opcode::add_immediate_to_accumulator },
+            { 0b0010'110, opcode::sub_immediate_from_accumulator },
+            { 0b0011'110, opcode::cmp_immediate_with_accumulator }
+        },
+        {
+            { 0b1000'10, opcode::mov_normal },
+
+            { 0b0000'00, opcode::add_normal },
+            { 0b0010'10, opcode::sub_normal },
+            { 0b0011'10, opcode::cmp_normal },
+            { 0b1000'00, opcode::addsubcmp_immediate }
+        },
+        {},
+        {
+            { 0b1011, opcode::mov_immediate_to_register }
+        }
     };
 
     std::vector<uint8_t> read_binary_file(const std::string& path)
@@ -72,7 +90,7 @@ namespace
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
 
         std::vector<uint8_t> data;
-        std::for_each(std::istreambuf_iterator<char>(input_file),
+        std::for_each(std::istreambuf_iterator(input_file),
                       std::istreambuf_iterator<char>(),
                       [&data](char c)
                       {
@@ -84,36 +102,12 @@ namespace
 
     opcode read_opcode(uint8_t b)
     {
-        switch (b >> 4)
+        for (size_t i = 0; i < opcode_maps.size(); ++i)
         {
-            case 0b1000:
-            {
-                switch (const uint8_t second_half = b & 0b1111)
-                {
-                    case 0b1110:
-                        return opcode::mov_to_segment_register;
-                    case 0b1100:
-                        return opcode::mov_from_segment_register;
-                    default:
-                        if ((second_half & 0b1100) == 0b1000)
-                            return opcode::mov_normal;
-                        break;
-                }
-                break;
-            }
-            case 0b1100:
-                return opcode::mov_immediate_to_register_or_memory;
-            case 0b1011:
-                return opcode::mov_immediate_to_register;
-            case 0b1010:
-                switch (b & 0b1110)
-                {
-                    case 0b0000:
-                        return opcode::mov_memory_to_accumulator;
-                    case 0b0010:
-                        return opcode::mov_accumulator_to_memory;
-                }
-                break;
+            std::unordered_map<uint8_t, opcode>& opcode_map = opcode_maps[i];
+
+            if (uint8_t key = b >> i; opcode_map.contains(key))
+                return opcode_map[key];
         }
 
         return opcode::none;
@@ -193,6 +187,9 @@ namespace
         switch (inst.opcode)
         {
             case opcode::mov_normal:
+            case opcode::add_normal:
+            case opcode::sub_normal:
+            case opcode::cmp_normal:
             {
                 inst.w = b & 1;
                 b >>= 1;
@@ -214,6 +211,7 @@ namespace
             }
 
             case opcode::mov_immediate_to_register_or_memory:
+            case opcode::addsubcmp_immediate:
             {
                 inst.w = b & 1;
 
@@ -221,7 +219,7 @@ namespace
                     return {};
 
                 inst.rm = b & 0b0111;
-                b >>= 6;
+                b >>= 6; // todo: extract middle 3 bits and assign actual opcode
                 inst.mod = b;
 
                 if (!read_displacement(data_iter, data_end, inst))
@@ -246,6 +244,9 @@ namespace
 
             case opcode::mov_memory_to_accumulator:
             case opcode::mov_accumulator_to_memory:
+            case opcode::add_immediate_to_accumulator:
+            case opcode::sub_immediate_from_accumulator:
+            case opcode::cmp_immediate_with_accumulator:
             {
                 inst.w = b & 1;
 
@@ -431,7 +432,7 @@ namespace
                 break;
         }
 
-        return { opcodes[inst.opcode], source, destination };
+        return { opcodes[inst.opcode], destination, source };
     }
 }
 
@@ -466,7 +467,7 @@ int main(int argc, char* argv[])
         // decode instructions and print assembly
         for (instruction& inst : instructions)
         {
-            auto [opcode, source, destination] = decode_instruction(inst);
+            auto [opcode, destination, source] = decode_instruction(inst);
 
             std::cout << opcode << ' ' << destination << ", " << source << '\n';
         }
