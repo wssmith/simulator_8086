@@ -27,7 +27,7 @@ enum class opcode : uint16_t
     cmp_immediate_with_register_or_memory,
     cmp_immediate_with_accumulator,
 
-    addsubcmp_immediate
+    arithmetic_immediate
 };
 
 #endif

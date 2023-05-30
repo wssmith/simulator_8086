@@ -77,7 +77,7 @@ namespace
             { 0b0000'00, opcode::add_normal },
             { 0b0010'10, opcode::sub_normal },
             { 0b0011'10, opcode::cmp_normal },
-            { 0b1000'00, opcode::addsubcmp_immediate }
+            { 0b1000'00, opcode::arithmetic_immediate }
         },
         {},
         {
@@ -210,7 +210,7 @@ namespace
                 break;
             }
 
-            case opcode::addsubcmp_immediate:
+            case opcode::arithmetic_immediate:
                 inst.s = (b >> 1) & 1;
                 [[fallthrough]];
 
@@ -227,7 +227,7 @@ namespace
                 b >>= 3;
                 inst.mod = b;
 
-                if (inst.opcode == opcode::addsubcmp_immediate)
+                if (inst.opcode == opcode::arithmetic_immediate)
                 {
                     inst.opcode = [&op]
                     {
