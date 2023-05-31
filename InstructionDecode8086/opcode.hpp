@@ -27,7 +27,28 @@ enum class opcode : uint16_t
     cmp_immediate_with_register_or_memory,
     cmp_immediate_with_accumulator,
 
-    arithmetic_immediate
+    arithmetic_immediate,
+
+    je,
+    jl,
+    jle,
+    jb,
+    jbe,
+    jp,
+    jo,
+    js,
+    jne,
+    jnl,
+    jg,
+    jnb,
+    ja,
+    jnp,
+    jno,
+    jns,
+    loop,
+    loopz,
+    loopnz,
+    jcxz,
 };
 
 #endif

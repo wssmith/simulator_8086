@@ -54,6 +54,27 @@ namespace
         { opcode::cmp_normal, cmp_name },
         { opcode::cmp_immediate_with_register_or_memory, cmp_name },
         { opcode::cmp_immediate_with_accumulator, cmp_name },
+
+        { opcode::je, "je" },
+        { opcode::jl, "jl" },
+        { opcode::jle, "jle" },
+        { opcode::jb, "jb" },
+        { opcode::jbe, "jbe" },
+        { opcode::jp, "jp" },
+        { opcode::jo, "jo" },
+        { opcode::js, "js" },
+        { opcode::jne, "jne" },
+        { opcode::jnl, "jnl" },
+        { opcode::jg, "jg" },
+        { opcode::jnb, "jnb" },
+        { opcode::ja, "ja" },
+        { opcode::jnp, "jnp" },
+        { opcode::jno, "jno" },
+        { opcode::jns, "jns" },
+        { opcode::loop, "loop" },
+        { opcode::loopz, "loopz" },
+        { opcode::loopnz, "loopnz" },
+        { opcode::jcxz, "jcxz" }
     };
 
     std::vector<std::unordered_map<uint8_t, opcode>> opcode_maps
@@ -61,6 +82,27 @@ namespace
         {
             { 0b1000'1110, opcode::mov_to_segment_register },
             { 0b1000'1100, opcode::mov_from_segment_register },
+
+            { 0b0111'0100 , opcode::je },
+            { 0b0111'1100 , opcode::jl },
+            { 0b0111'1110 , opcode::jle },
+            { 0b0111'0010 , opcode::jb },
+            { 0b0111'0110 , opcode::jbe },
+            { 0b0111'1010 , opcode::jp },
+            { 0b0111'0000 , opcode::jo },
+            { 0b0111'1000 , opcode::js },
+            { 0b0111'0101 , opcode::jne },
+            { 0b0111'1101 , opcode::jnl },
+            { 0b0111'1111 , opcode::jg },
+            { 0b0111'0011 , opcode::jnb },
+            { 0b0111'0111 , opcode::ja },
+            { 0b0111'1011 , opcode::jnp },
+            { 0b0111'0001 , opcode::jno },
+            { 0b0111'1001 , opcode::jns },
+            { 0b1110'0010 , opcode::loop },
+            { 0b1110'0001 , opcode::loopz },
+            { 0b1110'0000 , opcode::loopnz },
+            { 0b1110'0011 , opcode::jcxz },
         },
         {
             { 0b1100'011, opcode::mov_immediate_to_register_or_memory },
@@ -274,13 +316,13 @@ namespace
                 if (!read_and_advance(data_iter, data_end, b))
                     return {};
 
-                inst.addr_lo = b;
+                inst.data_lo = b;
                 if (inst.w)
                 {
                     if (!read_and_advance(data_iter, data_end, b))
                         return {};
 
-                    inst.addr_hi = b;
+                    inst.data_hi = b;
                 }
                 break;
             }
@@ -303,6 +345,33 @@ namespace
                 break;
             }
 
+            case opcode::je:
+            case opcode::jl:     
+            case opcode::jle:
+            case opcode::jb: 
+            case opcode::jbe:
+            case opcode::jp: 
+            case opcode::jo: 
+            case opcode::js: 
+            case opcode::jne:
+            case opcode::jnl:
+            case opcode::jg: 
+            case opcode::jnb:
+            case opcode::ja: 
+            case opcode::jnp:
+            case opcode::jno:
+            case opcode::jns:
+            case opcode::loop:
+            case opcode::loopz: 
+            case opcode::loopnz:
+            case opcode::jcxz:
+            {
+                if (!read_and_advance(data_iter, data_end, inst.data_lo))
+                    return {};
+
+                break;
+            }
+
             case opcode::none:
                 break;
         }
@@ -320,10 +389,7 @@ namespace
 
     std::string get_instruction_address(const instruction& inst)
     {
-        if (inst.w)
-            return "[" + std::to_string(static_cast<int16_t>(inst.addr_lo + (inst.addr_hi << 8))) + "]";
-        else
-            return "[" + std::to_string(static_cast<int8_t>(inst.addr_lo)) + "]";
+        return "[" + get_instruction_data(inst) + "]";
     }
 
     int16_t get_instruction_displacement(const instruction& inst, int8_t bytes)
@@ -458,6 +524,31 @@ namespace
                 // todo
                 break;
 
+            case opcode::je:
+            case opcode::jl:
+            case opcode::jle:
+            case opcode::jb:
+            case opcode::jbe:
+            case opcode::jp:
+            case opcode::jo:
+            case opcode::js:
+            case opcode::jne:
+            case opcode::jnl:
+            case opcode::jg:
+            case opcode::jnb:
+            case opcode::ja:
+            case opcode::jnp:
+            case opcode::jno:
+            case opcode::jns:
+            case opcode::loop:
+            case opcode::loopz:
+            case opcode::loopnz:
+            case opcode::jcxz:
+            {
+                destination = std::to_string(static_cast<int8_t>(inst.data_lo));
+                break;
+            }
+
             case opcode::none:
                 break;
         }
@@ -499,7 +590,10 @@ int main(int argc, char* argv[])
         {
             auto [opcode, destination, source] = decode_instruction(inst);
 
-            std::cout << opcode << ' ' << destination << ", " << source << '\n';
+            std::cout << opcode << ' ' << destination;
+            if (source.length() > 0)
+                std::cout << ", " << source;
+            std::cout << '\n';
         }
     }
     catch (std::exception& ex)
