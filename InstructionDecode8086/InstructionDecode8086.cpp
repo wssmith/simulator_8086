@@ -17,6 +17,8 @@
 
 namespace
 {
+    using data_iterator = std::vector<uint8_t>::const_iterator;
+
     constexpr std::array registers =
     {
         "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
@@ -170,8 +172,6 @@ namespace
                 return 0;
         }
     }
-
-    using data_iterator = std::vector<uint8_t>::const_iterator;
 
     bool read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
     {
