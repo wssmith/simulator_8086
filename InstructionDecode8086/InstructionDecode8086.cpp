@@ -7,13 +7,15 @@
 #include <ios>
 #include <iostream>
 #include <optional>
+#include <utility>
 #include <string>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
 
+#include "decoder.hpp"
 #include "instruction.hpp"
 #include "opcode.hpp"
+#include "overloaded.hpp"
 
 namespace
 {
@@ -21,13 +23,23 @@ namespace
 
     constexpr std::array registers =
     {
-        "al", "cl", "dl", "bl", "ah", "ch", "dh", "bh",
-        "ax", "cx", "dx", "bx", "sp", "bp", "si", "di"
+        "al", "cl", "dl", "bl",
+        "ah", "ch", "dh", "bh",
+        "ax", "cx", "dx", "bx",
+        "sp", "bp", "si", "di",
+        "cs", "ds", "ss", "es"
     };
 
-    constexpr std::array effective_addresses =
+    constexpr std::array<std::pair<register_access, std::optional<register_access>>, 8> effective_addresses =
     {
-        "bx + si", "bx + di", "bp + si", "bp + di", "si", "di", "bp", "bx"
+        std::pair{ register_access{11, 0}, register_access{14, 0} }, // bx + si
+        std::pair{ register_access{11, 0}, register_access{15, 0} }, // bx + di
+        std::pair{ register_access{13, 0}, register_access{14, 0} }, // bp + si
+        std::pair{ register_access{13, 0}, register_access{15, 0} }, // bp + di
+        std::pair{ register_access{14, 0}, std::optional<register_access>{} }, // si
+        std::pair{ register_access{15, 0}, std::optional<register_access>{} }, // di
+        std::pair{ register_access{13, 0}, std::optional<register_access>{} }, // bp
+        std::pair{ register_access{11, 0}, std::optional<register_access>{} }  // bx
     };
 
     constexpr const char* mov_name = "mov";
@@ -77,6 +89,50 @@ namespace
         { opcode::loopz, "loopz" },
         { opcode::loopnz, "loopnz" },
         { opcode::jcxz, "jcxz" }
+    };
+
+    std::unordered_map<opcode, operation_type> opcode_translation
+    {
+        { opcode::mov_normal, operation_type::op_mov },
+        { opcode::mov_immediate_to_register_or_memory, operation_type::op_mov },
+        { opcode::mov_immediate_to_register, operation_type::op_mov },
+        { opcode::mov_memory_to_accumulator, operation_type::op_mov },
+        { opcode::mov_accumulator_to_memory, operation_type::op_mov },
+        { opcode::mov_to_segment_register, operation_type::op_mov },
+        { opcode::mov_from_segment_register, operation_type::op_mov },
+
+        { opcode::add_normal, operation_type::op_add },
+        { opcode::add_immediate_to_register_or_memory, operation_type::op_add },
+        { opcode::add_immediate_to_accumulator, operation_type::op_add },
+
+        { opcode::sub_normal, operation_type::op_sub },
+        { opcode::sub_immediate_from_register_or_memory, operation_type::op_sub },
+        { opcode::sub_immediate_from_accumulator, operation_type::op_sub },
+
+        { opcode::cmp_normal, operation_type::op_cmp },
+        { opcode::cmp_immediate_with_register_or_memory, operation_type::op_cmp },
+        { opcode::cmp_immediate_with_accumulator, operation_type::op_cmp },
+
+        { opcode::je, operation_type::op_je },
+        { opcode::jl, operation_type::op_jl },
+        { opcode::jle, operation_type::op_jle },
+        { opcode::jb, operation_type::op_jb },
+        { opcode::jbe, operation_type::op_jbe },
+        { opcode::jp, operation_type::op_jp },
+        { opcode::jo, operation_type::op_jo },
+        { opcode::js, operation_type::op_js },
+        { opcode::jne, operation_type::op_jne },
+        { opcode::jnl, operation_type::op_jnl },
+        { opcode::jg, operation_type::op_jg },
+        { opcode::jnb, operation_type::op_jnb },
+        { opcode::ja, operation_type::op_ja },
+        { opcode::jnp, operation_type::op_jnp },
+        { opcode::jno, operation_type::op_jno },
+        { opcode::jns, operation_type::op_jns },
+        { opcode::loop, operation_type::op_loop },
+        { opcode::loopz, operation_type::op_loopz },
+        { opcode::loopnz, operation_type::op_loopnz },
+        { opcode::jcxz, operation_type::op_jcxz }
     };
 
     std::vector<std::unordered_map<uint8_t, opcode>> opcode_maps
@@ -240,9 +296,9 @@ namespace
                 if (!read_and_advance(data_iter, data_end, b))
                     return {};
 
-                inst.rm = b & 0b0111;
+                inst.rm = b & 0b111;
                 b >>= 3;
-                inst.reg = b & 0b0111;
+                inst.reg = b & 0b111;
                 b >>= 3;
                 inst.mod = b;
 
@@ -263,9 +319,9 @@ namespace
                 if (!read_and_advance(data_iter, data_end, b))
                     return {};
 
-                inst.rm = b & 0b0111;
+                inst.rm = b & 0b111;
                 b >>= 3;
-                uint8_t op = b & 0b0111;
+                uint8_t op = b & 0b111;
                 b >>= 3;
                 inst.mod = b;
 
@@ -299,6 +355,8 @@ namespace
             case opcode::add_immediate_to_accumulator:
             case opcode::sub_immediate_from_accumulator:
             case opcode::cmp_immediate_with_accumulator:
+            case opcode::mov_memory_to_accumulator:
+            case opcode::mov_accumulator_to_memory:
             {
                 inst.w = b & 1;
 
@@ -308,34 +366,15 @@ namespace
                 break;
             }
 
-            case opcode::mov_memory_to_accumulator:
-            case opcode::mov_accumulator_to_memory:
-            {
-                inst.w = b & 1;
-
-                if (!read_and_advance(data_iter, data_end, b))
-                    return {};
-
-                inst.data_lo = b;
-                if (inst.w)
-                {
-                    if (!read_and_advance(data_iter, data_end, b))
-                        return {};
-
-                    inst.data_hi = b;
-                }
-                break;
-            }
-
             case opcode::mov_to_segment_register:
             case opcode::mov_from_segment_register:
             {
                 if (!read_and_advance(data_iter, data_end, b)) 
                     return {};
 
-                inst.rm = b & 0b0111;
+                inst.rm = b & 0b111;
                 b >>= 3;
-                inst.sr = b & 0b011;
+                inst.sr = b & 0b11;
                 b >>= 3;
                 inst.mod = b;
 
@@ -379,17 +418,27 @@ namespace
         return inst;
     }
 
-    std::string get_instruction_data(const instruction& inst)
+    int16_t get_instruction_data(const instruction& inst)
     {
         if (inst.w && !inst.s)
-            return std::to_string(static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8)));
+            return static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8));
         else
-            return std::to_string(static_cast<int8_t>(inst.data_lo));
+            return static_cast<int8_t>(inst.data_lo);
     }
 
-    std::string get_instruction_address(const instruction& inst)
+    std::string get_instruction_data_string(const instruction& inst)
     {
-        return "[" + get_instruction_data(inst) + "]";
+        return std::to_string(get_instruction_data(inst));
+    }
+
+    std::string get_instruction_address_string(const instruction& inst)
+    {
+        return "[" + get_instruction_data_string(inst) + "]";
+    }
+
+    int16_t get_instruction_address(const instruction& inst)
+    {
+        return get_instruction_data(inst);
     }
 
     int16_t get_instruction_displacement(const instruction& inst, int8_t bytes)
@@ -406,55 +455,51 @@ namespace
         }
     }
 
-    std::string get_instruction_memory(const instruction& inst)
+    effective_address_expression get_instruction_memory(const instruction& inst)
     {
-        std::string address;
-
         int8_t displacement_bytes = 0;
         bool directAddress = false;
         switch (inst.mod)
         {
-            case 0b00: // direct address, 16-bit displacement
-                displacement_bytes = 2;
-                directAddress = (inst.rm == 0b110);
-                break;
+        case 0b00: // direct address, 16-bit displacement
+            displacement_bytes = 2;
+            directAddress = (inst.rm == 0b110);
+            break;
 
-            case 0b01: // memory mode, 8-bit displacement
-                displacement_bytes = 1;
-                break;
+        case 0b01: // memory mode, 8-bit displacement
+            displacement_bytes = 1;
+            break;
 
-            case 0b10: // memory mode, 16-bit displacement
-                displacement_bytes = 2;
-                break;
+        case 0b10: // memory mode, 16-bit displacement
+            displacement_bytes = 2;
+            break;
         }
 
         const auto displacement = get_instruction_displacement(inst, displacement_bytes);
 
+        effective_address_expression effective_address{};
         if (directAddress)
         {
-            if (displacement >= 0)
-                address = std::to_string(displacement);
-            else if (displacement < 0)
-                address = std::to_string(-displacement);
+            effective_address.explicit_segment = displacement;
         }
         else
         {
-            address = effective_addresses[inst.rm];
-            if (displacement > 0)
-                address += " + " + std::to_string(displacement);
-            else if (displacement < 0)
-                address += " - " + std::to_string(-displacement);
+            effective_address.displacement = displacement;
+
+            auto [term1, term2] = effective_addresses[inst.rm];
+
+            effective_address.terms[0] = effective_address_term{ term1, 0 };
+            if (term2.has_value())
+                effective_address.terms[1] = effective_address_term{ term2.value() , 0 };
         }
 
-        return "[" + address + "]";
+        return effective_address;
     }
 
-    using instruction_parts = std::tuple<std::string, std::string, std::string>;
-
-    instruction_parts decode_instruction(instruction& inst)
+    instruction_ex decode_instruction(const instruction& inst)
     {
-        std::string destination;
-        std::string source;
+        instruction_ex inst_ex;
+        inst_ex.op = opcode_translation[inst.opcode];
 
         switch (inst.opcode)
         {
@@ -465,14 +510,25 @@ namespace
             {
                 if (inst.mod == 0b11) // register mode
                 {
-                    destination = registers[(inst.d ? inst.reg : inst.rm) + 8 * inst.w];
-                    source = registers[(inst.d ? inst.rm : inst.reg) + 8 * inst.w];
+                    inst_ex.size = 2;
+                    inst_ex.operands[0] = register_access{ (inst.d ? inst.reg : inst.rm) + 8U * inst.w, 0 };
+                    inst_ex.operands[1] = register_access{ (inst.d ? inst.rm : inst.reg) + 8U * inst.w, 0 };
                 }
                 else // memory mode
                 {
-                    std::string address = get_instruction_memory(inst);
-                    destination = inst.d ? registers[inst.reg + 8 * inst.w] : address;
-                    source = inst.d ? address : registers[inst.reg + 8 * inst.w];
+                    effective_address_expression address_expr = get_instruction_memory(inst);
+
+                    inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+                    if (inst.d)
+                    {
+                        inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
+                        inst_ex.operands[1] = address_expr;
+                    }
+                    else
+                    {
+                        inst_ex.operands[0] = address_expr;
+                        inst_ex.operands[1] = register_access{ inst.reg + 8U * inst.w, 0 };
+                    }
                 }
                 break;
             }
@@ -482,15 +538,18 @@ namespace
             case opcode::sub_immediate_from_register_or_memory:
             case opcode::cmp_immediate_with_register_or_memory:
             {
+                inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+
                 if (inst.mod == 0b11) // register mode
                 {
-                    destination = registers[inst.rm + 8 * inst.w];
-                    source = get_instruction_data(inst);
+                    inst_ex.operands[0] = register_access{ inst.rm + 8U * inst.w, 0 };
+                    inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
                 }
                 else // memory mode
                 {
-                    destination = get_instruction_memory(inst);
-                    source = (inst.w ? "word " : "byte ") + get_instruction_data(inst);
+                    effective_address_expression address_expr = get_instruction_memory(inst);
+                    inst_ex.operands[0] = address_expr;
+                    inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
                 }
                 break;
             }
@@ -500,22 +559,25 @@ namespace
             case opcode::sub_immediate_from_accumulator:
             case opcode::cmp_immediate_with_accumulator:
             {
-                destination = registers[inst.reg + 8 * inst.w];
-                source = get_instruction_data(inst);
+                inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+                inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
+                inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
                 break;
             }
 
             case opcode::mov_memory_to_accumulator:
             {
-                destination = registers[inst.w ? 8 : 0];
-                source = get_instruction_address(inst);
+                inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+                inst_ex.operands[0] = register_access{ inst.w ? 8U : 0, 0 };
+                inst_ex.operands[1] = immediate{ get_instruction_address(inst), 0 };
                 break;
             }
 
             case opcode::mov_accumulator_to_memory:
             {
-                destination = get_instruction_address(inst);
-                source = registers[inst.w ? 8 : 0];
+                inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+                inst_ex.operands[0] = immediate{ get_instruction_address(inst), 0 };
+                inst_ex.operands[1] = register_access{ inst.w ? 8U : 0, 0 };
                 break;
             }
 
@@ -545,7 +607,8 @@ namespace
             case opcode::loopnz:
             case opcode::jcxz:
             {
-                destination = std::to_string(static_cast<int8_t>(inst.data_lo));
+                inst_ex.size = 2;
+                inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
                 break;
             }
 
@@ -553,7 +616,7 @@ namespace
                 break;
         }
 
-        return { opcodes[inst.opcode], destination, source };
+        return inst_ex;
     }
 }
 
@@ -586,13 +649,27 @@ int main(int argc, char* argv[])
         }
 
         // decode instructions and print assembly
-        for (instruction& inst : instructions)
+        for (const instruction& inst : instructions)
         {
-            auto [opcode, destination, source] = decode_instruction(inst);
+            instruction_ex inst_ex = decode_instruction(inst);
 
-            std::cout << opcode << ' ' << destination;
-            if (source.length() > 0)
-                std::cout << ", " << source;
+            // print instructions
+            const char* mnemonic = get_mneumonic(inst_ex.op);
+
+            auto match_operand = overloaded
+            {
+                [](const effective_address_expression& address_op) { return std::string(get_register_name(address_op.terms[0].reg)); },
+                [](register_access register_op) { return std::string(get_register_name(register_op)); },
+                [](immediate immediate_op) { return std::to_string(immediate_op.value); },
+                [](std::monostate) { return std::string(""); },
+            };
+
+            std::string first_operand = std::visit(match_operand, inst_ex.operands[0]);
+            std::string second_operand = std::visit(match_operand, inst_ex.operands[1]);
+
+            std::cout << mnemonic << ' ' << first_operand;
+            if (second_operand.length() > 0)
+                std::cout << ", " << second_operand;
             std::cout << '\n';
         }
     }

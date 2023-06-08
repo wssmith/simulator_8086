@@ -18,12 +18,21 @@
     <ClCompile Include="InstructionDecode8086.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="decoder.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="opcode.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="instruction.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="decoder.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="overloaded.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
