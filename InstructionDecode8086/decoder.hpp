@@ -3,8 +3,11 @@
 
 #include <array>
 #include <cstdint>
+#include <optional>
 #include <variant>
 #include <vector>
+
+struct instruction;
 
 using register_index = uint32_t;
 
@@ -207,52 +210,11 @@ struct instruction_ex
     register_index segment_override{};
 };
 
-//enum class instruction_bits_usage : u8
-//{
-//    bits_end,
-//
-//    bits_literal,
-//
-//    bits_d,
-//    bits_s,
-//    bits_w,
-//    bits_v,
-//    bits_z,
-//    bits_mod,
-//    bits_reg,
-//    bits_rm,
-//    brits_sr,
-//    brits_disp,
-//    bits_data,
-//
-//    bits_disp_always_w,
-//    bits_w_makes_data_w,
-//    bits_rm_reg_always_w,
-//    bits_rel_jmp_disp,
-//    bits_far,
-//
-//    bits_count,
-//};
-//
-//struct instruction_bits
-//{
-//    instruction_bits_usage usage;
-//    u8 bit_count;
-//    u8 shift;
-//    u8 value;
-//};
-//
-//struct instruction_encoding
-//{
-//    operation_type op;
-//    std::array<instruction_bits, 16> bits;
-//};
-//
-//using instruction_table = std::vector<instruction_encoding>;
+using data_iterator = std::vector<uint8_t>::const_iterator;
 
-instruction_ex decode_instruction(uint32_t source_size, uint8_t* source);
+std::optional<instruction> read_instruction(data_iterator& data_iter, const data_iterator& data_end);
+instruction_ex decode_instruction(const instruction& inst);
 char const* get_register_name(const register_access& reg_access);
 char const* get_mneumonic(operation_type type);
-//instruction_table get_instruction_table();
 
 #endif
