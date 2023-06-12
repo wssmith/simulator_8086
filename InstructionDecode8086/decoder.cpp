@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "instruction.hpp"
+#include "instruction_fields.hpp"
 #include "opcode.hpp"
 
 namespace
@@ -244,7 +244,7 @@ namespace
         return true;
     }
 
-    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
+    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& inst)
     {
         const int8_t displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
 
@@ -263,7 +263,7 @@ namespace
         return true;
     }
 
-    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction& inst)
+    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction_fields& inst)
     {
         if (!read_and_advance(iter, iter_end, inst.data_lo))
             return false;
@@ -277,7 +277,7 @@ namespace
         return true;
     }
 
-    int16_t get_instruction_data(const instruction& inst)
+    int16_t get_instruction_data(const instruction_fields& inst)
     {
         if (inst.w && !inst.s)
             return static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8));
@@ -285,22 +285,22 @@ namespace
             return static_cast<int8_t>(inst.data_lo);
     }
 
-    std::string get_instruction_data_string(const instruction& inst)
+    std::string get_instruction_data_string(const instruction_fields& inst)
     {
         return std::to_string(get_instruction_data(inst));
     }
 
-    std::string get_instruction_address_string(const instruction& inst)
+    std::string get_instruction_address_string(const instruction_fields& inst)
     {
         return "[" + get_instruction_data_string(inst) + "]";
     }
 
-    int16_t get_instruction_address(const instruction& inst)
+    int16_t get_instruction_address(const instruction_fields& inst)
     {
         return get_instruction_data(inst);
     }
 
-    int16_t get_instruction_displacement(const instruction& inst, int8_t bytes)
+    int16_t get_instruction_displacement(const instruction_fields& inst, int8_t bytes)
     {
         switch (bytes)
         {
@@ -314,7 +314,7 @@ namespace
         }
     }
 
-    effective_address_expression get_instruction_memory(const instruction& inst)
+    effective_address_expression get_instruction_memory(const instruction_fields& inst)
     {
         int8_t displacement_bytes = 0;
         bool directAddress = false;
@@ -366,9 +366,9 @@ char const* get_mneumonic(operation_type type)
     return mnemonics[type];
 }
 
-std::optional<instruction> read_instruction(data_iterator& data_iter, const data_iterator& data_end)
+std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end)
 {
-    instruction inst{};
+    instruction_fields inst{};
 
     uint8_t b = 0;
     if (!read_and_advance(data_iter, data_end, b))
@@ -505,16 +505,17 @@ std::optional<instruction> read_instruction(data_iterator& data_iter, const data
         break;
     }
 
+    default:
     case opcode::none:
-        break;
+        return {};
     }
 
     return inst;
 }
 
-instruction_ex decode_instruction(const instruction& inst)
+std::optional<instruction> decode_instruction(const instruction_fields& inst)
 {
-    instruction_ex inst_ex;
+    instruction inst_ex;
     inst_ex.op = opcode_translation[inst.opcode];
 
     switch (inst.opcode)
@@ -628,9 +629,21 @@ instruction_ex decode_instruction(const instruction& inst)
         break;
     }
 
+    default:
     case opcode::none:
-        break;
+        return {};
     }
 
     return inst_ex;
+}
+
+std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end)
+{
+    const std::optional<instruction_fields> fields_result = read_fields(data_iter, data_end);
+    if (fields_result.has_value())
+    {
+        const std::optional<instruction> inst = decode_instruction(fields_result.value());
+        return inst;
+    }
+    return {};
 }

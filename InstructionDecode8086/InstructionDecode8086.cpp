@@ -11,7 +11,6 @@
 #include <vector>
 
 #include "decoder.hpp"
-#include "instruction.hpp"
 #include "overloaded.hpp"
 
 namespace
@@ -48,25 +47,19 @@ int main(int argc, char* argv[])
         const std::vector<uint8_t> data = read_binary_file(input_path);
 
         // read instructions
-        std::vector<instruction> instructions;
         auto data_iter = data.cbegin();
         const auto data_end = data.cend();
 
         while (data_iter != data_end)
         {
-            std::optional<instruction> result = read_instruction(data_iter, data_end);
+            std::optional<instruction> inst_result = decode_instruction(data_iter, data_end);
+            if (!inst_result.has_value())
+                continue;
 
-            if (result.has_value())
-                instructions.push_back(result.value());
-        }
-        
-        // decode instructions and print assembly
-        for (const instruction& inst : instructions)
-        {
-            instruction_ex inst_ex = decode_instruction(inst);
+            instruction inst = inst_result.value();
 
             // print instructions
-            const char* mnemonic = get_mneumonic(inst_ex.op);
+            const char* mnemonic = get_mneumonic(inst.op);
 
             auto match_operand = overloaded
             {
@@ -76,8 +69,8 @@ int main(int argc, char* argv[])
                 [](std::monostate) { return std::string(""); },
             };
 
-            std::string first_operand = std::visit(match_operand, inst_ex.operands[0]);
-            std::string second_operand = std::visit(match_operand, inst_ex.operands[1]);
+            std::string first_operand = std::visit(match_operand, inst.operands[0]);
+            std::string second_operand = std::visit(match_operand, inst.operands[1]);
 
             std::cout << mnemonic << ' ' << first_operand;
             if (second_operand.length() > 0)

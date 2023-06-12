@@ -7,7 +7,7 @@
 #include <variant>
 #include <vector>
 
-struct instruction;
+struct instruction_fields;
 
 using register_index = uint32_t;
 
@@ -197,7 +197,7 @@ enum class operand_type : uint32_t
 
 using instruction_operand = std::variant<std::monostate, effective_address_expression, register_access, immediate>;
 
-struct instruction_ex
+struct instruction
 {
     uint32_t address{};
     uint32_t size{};
@@ -212,8 +212,9 @@ struct instruction_ex
 
 using data_iterator = std::vector<uint8_t>::const_iterator;
 
-std::optional<instruction> read_instruction(data_iterator& data_iter, const data_iterator& data_end);
-instruction_ex decode_instruction(const instruction& inst);
+std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end);
+std::optional<instruction> decode_instruction(const instruction_fields& inst);
+std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end);
 char const* get_register_name(const register_access& reg_access);
 char const* get_mneumonic(operation_type type);
 

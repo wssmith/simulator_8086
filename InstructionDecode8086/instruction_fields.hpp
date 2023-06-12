@@ -5,7 +5,7 @@
 
 enum class opcode : uint16_t;
 
-struct instruction
+struct instruction_fields
 {
     opcode opcode{};
     uint8_t mod = 0;
