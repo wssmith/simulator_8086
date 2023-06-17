@@ -112,6 +112,7 @@ using data_iterator = std::vector<uint8_t>::const_iterator;
 std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end);
 std::optional<instruction> decode_instruction(const instruction_fields& inst);
 std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end);
+
 char const* get_register_name(const register_access& reg_access);
 char const* get_mneumonic(operation_type type);
 

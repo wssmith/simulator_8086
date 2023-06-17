@@ -19,7 +19,8 @@ namespace
         "ah", "ch", "dh", "bh",
         "ax", "cx", "dx", "bx",
         "sp", "bp", "si", "di",
-        "cs", "ds", "ss", "es"
+        "es", "cs", "ss", "ds",
+        "ip"
     };
 
     std::unordered_map<operation_type, const char*> mnemonics
@@ -518,6 +519,10 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     instruction inst_ex;
     inst_ex.op = opcode_translation[inst.opcode];
 
+    const bool wide_data = (inst.w && !inst.s);
+    const uint32_t inst_size = wide_data ? 4 : 3;
+    const uint32_t data_size = wide_data ? 2 : 1;
+
     switch (inst.opcode)
     {
     case opcode::mov_normal:
@@ -528,23 +533,43 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
         if (inst.mod == 0b11) // register mode
         {
             inst_ex.size = 2;
-            inst_ex.operands[0] = register_access{ (inst.d ? inst.reg : inst.rm) + 8U * inst.w, 0 };
-            inst_ex.operands[1] = register_access{ (inst.d ? inst.rm : inst.reg) + 8U * inst.w, 0 };
+            inst_ex.operands[0] = register_access
+            {
+                .index = (inst.d ? inst.reg : inst.rm) + 8U * inst.w,
+                .offset = 0,
+                .count = data_size
+            };
+            inst_ex.operands[1] = register_access
+            {
+                .index = (inst.d ? inst.rm : inst.reg) + 8U * inst.w,
+                .offset = 0,
+                .count = data_size
+            };
         }
         else // memory mode
         {
             effective_address_expression address_expr = get_instruction_memory(inst);
 
-            inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+            inst_ex.size = inst_size;
             if (inst.d)
             {
-                inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
+                inst_ex.operands[0] = register_access
+                {
+                    .index = inst.reg + 8U * inst.w,
+                    .offset = 0,
+                    .count = data_size
+                };
                 inst_ex.operands[1] = address_expr;
             }
             else
             {
                 inst_ex.operands[0] = address_expr;
-                inst_ex.operands[1] = register_access{ inst.reg + 8U * inst.w, 0 };
+                inst_ex.operands[1] = register_access
+                {
+                    .index = inst.reg + 8U * inst.w,
+                    .offset = 0,
+                    .count = data_size
+                };
             }
         }
         break;
@@ -555,18 +580,31 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::sub_immediate_from_register_or_memory:
     case opcode::cmp_immediate_with_register_or_memory:
     {
-        inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
+        inst_ex.size = inst_size;
 
         if (inst.mod == 0b11) // register mode
         {
-            inst_ex.operands[0] = register_access{ inst.rm + 8U * inst.w, 0 };
-            inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
+            inst_ex.operands[0] = register_access
+            {
+                .index = inst.rm + 8U * inst.w,
+                .offset = 0,
+                .count = data_size
+            };
+            inst_ex.operands[1] = immediate
+            {
+                .value = get_instruction_data(inst),
+                .flags = 0
+            };
         }
         else // memory mode
         {
             effective_address_expression address_expr = get_instruction_memory(inst);
             inst_ex.operands[0] = address_expr;
-            inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
+            inst_ex.operands[1] = immediate
+            {
+                .value = get_instruction_data(inst),
+                .flags = 0
+            };
         }
         break;
     }
@@ -576,25 +614,52 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::sub_immediate_from_accumulator:
     case opcode::cmp_immediate_with_accumulator:
     {
-        inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
-        inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
-        inst_ex.operands[1] = immediate{ get_instruction_data(inst), 0 };
+        inst_ex.size = inst_size;
+        inst_ex.operands[0] = register_access
+        {
+            .index = inst.reg + 8U * inst.w,
+            .offset = 0,
+            .count = data_size
+        };
+        inst_ex.operands[1] = immediate
+        {
+            .value = get_instruction_data(inst),
+            .flags = 0
+        };
         break;
     }
 
     case opcode::mov_memory_to_accumulator:
     {
-        inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
-        inst_ex.operands[0] = register_access{ inst.w ? 8U : 0, 0 };
-        inst_ex.operands[1] = immediate{ get_instruction_address(inst), 0 };
+        inst_ex.size = inst_size;
+        inst_ex.operands[0] = register_access
+        {
+            .index = inst.w ? 8U : 0,
+            .offset = 0,
+            .count = data_size
+        };
+        inst_ex.operands[1] = immediate
+        {
+            .value = get_instruction_address(inst),
+            .flags = 0
+        };
         break;
     }
 
     case opcode::mov_accumulator_to_memory:
     {
-        inst_ex.size = (inst.w && !inst.s) ? 4 : 3;
-        inst_ex.operands[0] = immediate{ get_instruction_address(inst), 0 };
-        inst_ex.operands[1] = register_access{ inst.w ? 8U : 0, 0 };
+        inst_ex.size = inst_size;
+        inst_ex.operands[0] = immediate
+        {
+            .value = get_instruction_address(inst),
+            .flags = 0
+        };
+        inst_ex.operands[1] = register_access
+        {
+            .index = inst.w ? 8U : 0,
+            .offset = 0,
+            .count = data_size
+        };
         break;
     }
 
@@ -625,7 +690,12 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::jcxz:
     {
         inst_ex.size = 2;
-        inst_ex.operands[0] = register_access{ inst.reg + 8U * inst.w, 0 };
+        inst_ex.operands[0] = register_access
+        {
+            .index = inst.reg + 8U * inst.w,
+            .offset = 0,
+            .count = 1
+        };
         break;
     }
 
