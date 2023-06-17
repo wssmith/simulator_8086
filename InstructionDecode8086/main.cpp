@@ -1,5 +1,3 @@
-// InstructionDecode8086.cpp
-
 #include <algorithm>
 #include <array>
 #include <cstdint>
