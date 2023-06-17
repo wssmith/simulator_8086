@@ -64,7 +64,7 @@ int main(int argc, char* argv[])
             auto match_operand = overloaded
             {
                 [](const effective_address_expression& address_op) { return std::string(get_register_name(address_op.terms[0].reg)); },
-                [](register_access register_op) { return std::string(get_register_name(register_op)); },
+                [](const register_access& register_op) { return std::string(get_register_name(register_op)); },
                 [](immediate immediate_op) { return std::to_string(immediate_op.value); },
                 [](std::monostate) { return std::string(""); },
             };
