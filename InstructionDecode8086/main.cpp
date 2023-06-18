@@ -61,7 +61,19 @@ int main(int argc, char* argv[])
 
             auto match_operand = overloaded
             {
-                [](const effective_address_expression& address_op) { return std::string(get_register_name(address_op.terms[0].reg)); },
+                [](const effective_address_expression& address_op)
+                {
+                    std::string address_text = "[" + std::string(get_register_name(address_op.term1.reg));
+
+                    if (address_op.term2.has_value())
+                        address_text += " + " + std::string(get_register_name(address_op.term2.value().reg));
+
+                    if (address_op.displacement > 0)
+                        address_text += " + " + std::to_string(address_op.displacement);
+
+                    address_text += "]";
+                    return address_text;
+                },
                 [](const register_access& register_op) { return std::string(get_register_name(register_op)); },
                 [](immediate immediate_op) { return std::to_string(immediate_op.value); },
                 [](std::monostate) { return std::string(""); },

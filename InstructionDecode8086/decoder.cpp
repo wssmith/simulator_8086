@@ -53,14 +53,14 @@ namespace
 
     constexpr std::array<std::pair<register_access, std::optional<register_access>>, 8> effective_addresses =
     {
-        std::pair{ register_access{11, 0}, register_access{14, 0} }, // bx + si
-        std::pair{ register_access{11, 0}, register_access{15, 0} }, // bx + di
-        std::pair{ register_access{13, 0}, register_access{14, 0} }, // bp + si
-        std::pair{ register_access{13, 0}, register_access{15, 0} }, // bp + di
-        std::pair{ register_access{14, 0}, std::optional<register_access>{} }, // si
-        std::pair{ register_access{15, 0}, std::optional<register_access>{} }, // di
-        std::pair{ register_access{13, 0}, std::optional<register_access>{} }, // bp
-        std::pair{ register_access{11, 0}, std::optional<register_access>{} }  // bx
+        std::pair{ register_access{11, 0, 1}, register_access{14, 0, 1} }, // bx + si
+        std::pair{ register_access{11, 0, 1}, register_access{15, 0, 1} }, // bx + di
+        std::pair{ register_access{13, 0, 1}, register_access{14, 0, 1} }, // bp + si
+        std::pair{ register_access{13, 0, 1}, register_access{15, 0, 1} }, // bp + di
+        std::pair{ register_access{14, 0, 1}, std::optional<register_access>{} }, // si
+        std::pair{ register_access{15, 0, 2}, std::optional<register_access>{} }, // di
+        std::pair{ register_access{13, 0, 2}, std::optional<register_access>{} }, // bp
+        std::pair{ register_access{11, 0, 2}, std::optional<register_access>{} }  // bx
     };
 
     constexpr const char* mov_name = "mov";
@@ -348,9 +348,9 @@ namespace
 
             auto [term1, term2] = effective_addresses[inst.rm];
 
-            effective_address.terms[0] = effective_address_term{ term1, 0 };
+            effective_address.term1 = effective_address_term{ term1, 0 };
             if (term2.has_value())
-                effective_address.terms[1] = effective_address_term{ term2.value() , 0 };
+                effective_address.term2 = effective_address_term{ term2.value(), 0 };
         }
 
         return effective_address;

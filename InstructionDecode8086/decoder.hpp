@@ -57,15 +57,15 @@ enum class instruction_flag
 
 struct register_access
 {
-    register_index index;
-    uint32_t offset;
-    uint32_t count;
+    register_index index{};
+    uint32_t offset{};
+    uint32_t count{};
 };
 
 struct effective_address_term
 {
-    register_access reg;
-    int32_t scale;
+    register_access reg{};
+    int32_t scale{};
 };
 
 enum class effective_address_flag
@@ -75,10 +75,11 @@ enum class effective_address_flag
 
 struct effective_address_expression
 {
-    std::array<effective_address_term, 2> terms;
-    uint32_t explicit_segment;
-    int32_t displacement;
-    uint32_t flags;
+    effective_address_term term1{};
+    std::optional<effective_address_term> term2{};
+    uint32_t explicit_segment{};
+    int32_t displacement{};
+    uint32_t flags{};
 };
 
 enum class immediate_flag
@@ -88,8 +89,8 @@ enum class immediate_flag
 
 struct immediate
 {
-    int32_t value;
-    uint32_t flags;
+    int32_t value{};
+    uint32_t flags{};
 };
 
 using instruction_operand = std::variant<std::monostate, effective_address_expression, register_access, immediate>;
