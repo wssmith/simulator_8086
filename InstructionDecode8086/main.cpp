@@ -27,6 +27,60 @@ namespace
 
         return data;
     }
+
+    std::string to_assembly(const instruction& inst)
+    {
+        const char* mnemonic = get_mneumonic(inst.op);
+
+        auto match_operand = overloaded
+        {
+            [](direct_address direct_address_op)
+            {
+                return "[" + std::to_string(direct_address_op.address) + "]";
+            },
+            [](const effective_address_expression& address_op)
+            {
+                std::string address_text = "[" + std::string(get_register_name(address_op.term1.reg));
+
+                if (address_op.term2.has_value())
+                    address_text += " + " + std::string(get_register_name(address_op.term2.value().reg));
+
+                if (address_op.displacement > 0)
+                    address_text += " + " + std::to_string(address_op.displacement);
+                else if (address_op.displacement < 0)
+                    address_text += " - " + std::to_string(-address_op.displacement);
+
+                address_text += "]";
+                return address_text;
+            },
+            [](const register_access& register_op)
+            {
+                return std::string(get_register_name(register_op));
+            },
+            [&inst](immediate immediate_op)
+            {
+                std::string immediate_text = std::to_string(immediate_op.value);
+
+                if (std::holds_alternative<effective_address_expression>(inst.operands[0]))
+                {
+                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flag::inst_wide)) != 0;
+                    immediate_text = (is_word ? "word " : "byte ") + immediate_text;  // NOLINT(performance-inefficient-string-concatenation)
+                }
+
+                return immediate_text;
+            },
+            [](std::monostate) { return std::string(); },
+        };
+
+        const std::string first_operand = std::visit(match_operand, inst.operands[0]);
+        const std::string second_operand = std::visit(match_operand, inst.operands[1]);
+
+        std::string asm_line = std::string(mnemonic) + " " + first_operand;
+        if (second_operand.length() != 0)
+            asm_line += ", " + second_operand;
+
+        return asm_line;
+    }
 }
 
 int main(int argc, char* argv[])
@@ -57,35 +111,8 @@ int main(int argc, char* argv[])
             instruction inst = inst_result.value();
 
             // print instructions
-            const char* mnemonic = get_mneumonic(inst.op);
-
-            auto match_operand = overloaded
-            {
-                [](const effective_address_expression& address_op)
-                {
-                    std::string address_text = "[" + std::string(get_register_name(address_op.term1.reg));
-
-                    if (address_op.term2.has_value())
-                        address_text += " + " + std::string(get_register_name(address_op.term2.value().reg));
-
-                    if (address_op.displacement > 0)
-                        address_text += " + " + std::to_string(address_op.displacement);
-
-                    address_text += "]";
-                    return address_text;
-                },
-                [](const register_access& register_op) { return std::string(get_register_name(register_op)); },
-                [](immediate immediate_op) { return std::to_string(immediate_op.value); },
-                [](std::monostate) { return std::string(""); },
-            };
-
-            std::string first_operand = std::visit(match_operand, inst.operands[0]);
-            std::string second_operand = std::visit(match_operand, inst.operands[1]);
-
-            std::cout << mnemonic << ' ' << first_operand;
-            if (second_operand.length() > 0)
-                std::cout << ", " << second_operand;
-            std::cout << '\n';
+            std::string asm_line = to_assembly(inst);
+            std::cout << asm_line << '\n';
         }
     }
     catch (std::exception& ex)

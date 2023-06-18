@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <optional>
 #include <utility>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
@@ -286,19 +285,12 @@ namespace
             return static_cast<int8_t>(inst.data_lo);
     }
 
-    std::string get_instruction_data_string(const instruction_fields& inst)
+    uint16_t get_instruction_address(const instruction_fields& inst)
     {
-        return std::to_string(get_instruction_data(inst));
-    }
-
-    std::string get_instruction_address_string(const instruction_fields& inst)
-    {
-        return "[" + get_instruction_data_string(inst) + "]";
-    }
-
-    int16_t get_instruction_address(const instruction_fields& inst)
-    {
-        return get_instruction_data(inst);
+        if (inst.w && !inst.s)
+            return static_cast<uint16_t>(inst.data_lo + (inst.data_hi << 8));
+        else
+            return static_cast<uint8_t>(inst.data_lo);
     }
 
     int16_t get_instruction_displacement(const instruction_fields& inst, int8_t bytes)
@@ -315,7 +307,21 @@ namespace
         }
     }
 
-    effective_address_expression get_instruction_memory(const instruction_fields& inst)
+    uint16_t get_instruction_direct_address(const instruction_fields& inst, int8_t bytes)
+    {
+        switch (bytes)
+        {
+        case 0:
+        default:
+            return 0;
+        case 1:
+            return static_cast<uint8_t>(inst.disp_lo);
+        case 2:
+            return static_cast<uint16_t>((inst.disp_hi << 8) + inst.disp_lo);
+        }
+    }
+
+    instruction_operand get_instruction_memory(const instruction_fields& inst)
     {
         int8_t displacement_bytes = 0;
         bool directAddress = false;
@@ -334,26 +340,38 @@ namespace
             displacement_bytes = 2;
             break;
         }
-
-        const auto displacement = get_instruction_displacement(inst, displacement_bytes);
-
-        effective_address_expression effective_address{};
+        
         if (directAddress)
         {
-            effective_address.explicit_segment = displacement;
+            const uint16_t address = get_instruction_direct_address(inst, displacement_bytes);
+            return direct_address{ .address = address };
         }
         else
         {
+            effective_address_expression effective_address{};
+
+            const auto displacement = get_instruction_displacement(inst, displacement_bytes);
             effective_address.displacement = displacement;
 
-            auto [term1, term2] = effective_addresses[inst.rm];
+            const auto& [term1, term2] = effective_addresses[inst.rm];
 
-            effective_address.term1 = effective_address_term{ term1, 0 };
+            effective_address.term1 = effective_address_term
+            {
+                .reg = term1,
+                .scale = 0
+            };
+
             if (term2.has_value())
-                effective_address.term2 = effective_address_term{ term2.value(), 0 };
-        }
+            {
+                effective_address.term2 = effective_address_term
+                {
+                    .reg = term2.value(),  // NOLINT(bugprone-unchecked-optional-access)
+                    .scale = 0
+                };
+            }
 
-        return effective_address;
+            return effective_address;
+        }
     }
 }
 
@@ -369,60 +387,60 @@ char const* get_mneumonic(operation_type type)
 
 std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end)
 {
-    instruction_fields inst{};
+    instruction_fields fields{};
 
     uint8_t b = 0;
     if (!read_and_advance(data_iter, data_end, b))
         return {};
 
-    inst.opcode = read_opcode(b);
+    fields.opcode = read_opcode(b);
 
-    switch (inst.opcode)
+    switch (fields.opcode)
     {
     case opcode::mov_normal:
     case opcode::add_normal:
     case opcode::sub_normal:
     case opcode::cmp_normal:
     {
-        inst.w = b & 1;
+        fields.w = b & 1;
         b >>= 1;
-        inst.d = b & 1;
+        fields.d = b & 1;
 
         if (!read_and_advance(data_iter, data_end, b))
             return {};
 
-        inst.rm = b & 0b111;
+        fields.rm = b & 0b111;
         b >>= 3;
-        inst.reg = b & 0b111;
+        fields.reg = b & 0b111;
         b >>= 3;
-        inst.mod = b;
+        fields.mod = b;
 
-        if (!read_displacement(data_iter, data_end, inst))
+        if (!read_displacement(data_iter, data_end, fields))
             return {};
 
         break;
     }
 
     case opcode::arithmetic_immediate:
-        inst.s = (b >> 1) & 1;
+        fields.s = (b >> 1) & 1;
         [[fallthrough]];
 
     case opcode::mov_immediate_to_register_or_memory:
     {
-        inst.w = b & 1;
+        fields.w = b & 1;
 
         if (!read_and_advance(data_iter, data_end, b))
             return {};
 
-        inst.rm = b & 0b111;
+        fields.rm = b & 0b111;
         b >>= 3;
         uint8_t op = b & 0b111;
         b >>= 3;
-        inst.mod = b;
+        fields.mod = b;
 
-        if (inst.opcode == opcode::arithmetic_immediate)
+        if (fields.opcode == opcode::arithmetic_immediate)
         {
-            inst.opcode = [&op]
+            fields.opcode = [&op]
             {
                 switch (op)
                 {
@@ -434,16 +452,16 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
             }();
         }
 
-        if (!read_displacement(data_iter, data_end, inst))
+        if (!read_displacement(data_iter, data_end, fields))
             return {};
-        if (!read_data(data_iter, data_end, inst))
+        if (!read_data(data_iter, data_end, fields))
             return {};
 
         break;
     }
 
     case opcode::mov_immediate_to_register:
-        inst.reg = b & 0b111;
+        fields.reg = b & 0b111;
         b >>= 3;
         [[fallthrough]];
 
@@ -453,9 +471,9 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
     case opcode::mov_memory_to_accumulator:
     case opcode::mov_accumulator_to_memory:
     {
-        inst.w = b & 1;
+        fields.w = b & 1;
 
-        if (!read_data(data_iter, data_end, inst))
+        if (!read_data(data_iter, data_end, fields))
             return {};
 
         break;
@@ -467,13 +485,13 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
         if (!read_and_advance(data_iter, data_end, b))
             return {};
 
-        inst.rm = b & 0b111;
+        fields.rm = b & 0b111;
         b >>= 3;
-        inst.sr = b & 0b11;
+        fields.sr = b & 0b11;
         b >>= 3;
-        inst.mod = b;
+        fields.mod = b;
 
-        if (!read_displacement(data_iter, data_end, inst))
+        if (!read_displacement(data_iter, data_end, fields))
             return {};
 
         break;
@@ -500,7 +518,7 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
     case opcode::loopnz:
     case opcode::jcxz:
     {
-        if (!read_and_advance(data_iter, data_end, inst.data_lo))
+        if (!read_and_advance(data_iter, data_end, fields.data_lo))
             return {};
 
         break;
@@ -511,62 +529,63 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
         return {};
     }
 
-    return inst;
+    return fields;
 }
 
-std::optional<instruction> decode_instruction(const instruction_fields& inst)
+std::optional<instruction> decode_instruction(const instruction_fields& fields)
 {
-    instruction inst_ex;
-    inst_ex.op = opcode_translation[inst.opcode];
+    instruction inst;
+    inst.op = opcode_translation[fields.opcode];
 
-    const bool wide_data = (inst.w && !inst.s);
-    const uint32_t inst_size = wide_data ? 4 : 3;
+    const bool wide_data = (fields.w && !fields.s);
     const uint32_t data_size = wide_data ? 2 : 1;
 
-    switch (inst.opcode)
+    switch (fields.opcode)
     {
     case opcode::mov_normal:
     case opcode::add_normal:
     case opcode::sub_normal:
     case opcode::cmp_normal:
     {
-        if (inst.mod == 0b11) // register mode
+        if (fields.mod == 0b11) // register mode
         {
-            inst_ex.size = 2;
-            inst_ex.operands[0] = register_access
+            inst.size = 2;
+            inst.operands[0] = register_access
             {
-                .index = (inst.d ? inst.reg : inst.rm) + 8U * inst.w,
+                .index = (fields.d ? fields.reg : fields.rm) + 8U * fields.w,
                 .offset = 0,
                 .count = data_size
             };
-            inst_ex.operands[1] = register_access
+            inst.operands[1] = register_access
             {
-                .index = (inst.d ? inst.rm : inst.reg) + 8U * inst.w,
+                .index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w,
                 .offset = 0,
                 .count = data_size
             };
         }
         else // memory mode
         {
-            effective_address_expression address_expr = get_instruction_memory(inst);
+            const auto address = get_instruction_memory(fields);
 
-            inst_ex.size = inst_size;
-            if (inst.d)
+            inst.size = wide_data ? 4 : 3;
+            inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
+
+            if (fields.d)
             {
-                inst_ex.operands[0] = register_access
+                inst.operands[0] = register_access
                 {
-                    .index = inst.reg + 8U * inst.w,
+                    .index = fields.reg + 8U * fields.w,
                     .offset = 0,
                     .count = data_size
                 };
-                inst_ex.operands[1] = address_expr;
+                inst.operands[1] = address;
             }
             else
             {
-                inst_ex.operands[0] = address_expr;
-                inst_ex.operands[1] = register_access
+                inst.operands[0] = address;
+                inst.operands[1] = register_access
                 {
-                    .index = inst.reg + 8U * inst.w,
+                    .index = fields.reg + 8U * fields.w,
                     .offset = 0,
                     .count = data_size
                 };
@@ -580,29 +599,30 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::sub_immediate_from_register_or_memory:
     case opcode::cmp_immediate_with_register_or_memory:
     {
-        inst_ex.size = inst_size;
+        inst.size = wide_data ? 4 : 3;
+        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
 
-        if (inst.mod == 0b11) // register mode
+        if (fields.mod == 0b11) // register mode
         {
-            inst_ex.operands[0] = register_access
+            inst.operands[0] = register_access
             {
-                .index = inst.rm + 8U * inst.w,
+                .index = fields.rm + 8U * fields.w,
                 .offset = 0,
                 .count = data_size
             };
-            inst_ex.operands[1] = immediate
+            inst.operands[1] = immediate
             {
-                .value = get_instruction_data(inst),
+                .value = get_instruction_data(fields),
                 .flags = 0
             };
         }
         else // memory mode
         {
-            effective_address_expression address_expr = get_instruction_memory(inst);
-            inst_ex.operands[0] = address_expr;
-            inst_ex.operands[1] = immediate
+            const auto address = get_instruction_memory(fields);
+            inst.operands[0] = address;
+            inst.operands[1] = immediate
             {
-                .value = get_instruction_data(inst),
+                .value = get_instruction_data(fields),
                 .flags = 0
             };
         }
@@ -614,16 +634,18 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::sub_immediate_from_accumulator:
     case opcode::cmp_immediate_with_accumulator:
     {
-        inst_ex.size = inst_size;
-        inst_ex.operands[0] = register_access
+        inst.size = wide_data ? 4 : 3;
+        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
+
+        inst.operands[0] = register_access
         {
-            .index = inst.reg + 8U * inst.w,
+            .index = fields.reg + 8U * fields.w,
             .offset = 0,
             .count = data_size
         };
-        inst_ex.operands[1] = immediate
+        inst.operands[1] = immediate
         {
-            .value = get_instruction_data(inst),
+            .value = get_instruction_data(fields),
             .flags = 0
         };
         break;
@@ -631,32 +653,34 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
 
     case opcode::mov_memory_to_accumulator:
     {
-        inst_ex.size = inst_size;
-        inst_ex.operands[0] = register_access
+        inst.size = wide_data ? 4 : 3;
+        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
+
+        inst.operands[0] = register_access
         {
-            .index = inst.w ? 8U : 0,
+            .index = fields.w ? 8U : 0,
             .offset = 0,
             .count = data_size
         };
-        inst_ex.operands[1] = immediate
+        inst.operands[1] = direct_address
         {
-            .value = get_instruction_address(inst),
-            .flags = 0
+            .address = get_instruction_address(fields),
         };
         break;
     }
 
     case opcode::mov_accumulator_to_memory:
     {
-        inst_ex.size = inst_size;
-        inst_ex.operands[0] = immediate
+        inst.size = wide_data ? 4 : 3;
+        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
+
+        inst.operands[0] = direct_address
         {
-            .value = get_instruction_address(inst),
-            .flags = 0
+            .address = get_instruction_address(fields),
         };
-        inst_ex.operands[1] = register_access
+        inst.operands[1] = register_access
         {
-            .index = inst.w ? 8U : 0,
+            .index = fields.w ? 8U : 0,
             .offset = 0,
             .count = data_size
         };
@@ -689,10 +713,10 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
     case opcode::loopnz:
     case opcode::jcxz:
     {
-        inst_ex.size = 2;
-        inst_ex.operands[0] = register_access
+        inst.size = 2;
+        inst.operands[0] = register_access
         {
-            .index = inst.reg + 8U * inst.w,
+            .index = fields.reg + 8U * fields.w,
             .offset = 0,
             .count = 1
         };
@@ -704,7 +728,7 @@ std::optional<instruction> decode_instruction(const instruction_fields& inst)
         return {};
     }
 
-    return inst_ex;
+    return inst;
 }
 
 std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end)

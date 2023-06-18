@@ -55,6 +55,11 @@ enum class instruction_flag
     inst_rep_ne = 0x20,
 };
 
+struct direct_address
+{
+    uint32_t address;
+};
+
 struct register_access
 {
     register_index index{};
@@ -93,7 +98,7 @@ struct immediate
     uint32_t flags{};
 };
 
-using instruction_operand = std::variant<std::monostate, effective_address_expression, register_access, immediate>;
+using instruction_operand = std::variant<std::monostate, direct_address, effective_address_expression, register_access, immediate>;
 
 struct instruction
 {
@@ -111,7 +116,7 @@ struct instruction
 using data_iterator = std::vector<uint8_t>::const_iterator;
 
 std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end);
-std::optional<instruction> decode_instruction(const instruction_fields& inst);
+std::optional<instruction> decode_instruction(const instruction_fields& fields);
 std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end);
 
 char const* get_register_name(const register_access& reg_access);
