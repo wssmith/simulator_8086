@@ -4,6 +4,7 @@
 #include <fstream>
 #include <ios>
 #include <iostream>
+#include <iterator>
 #include <optional>
 #include <string>
 #include <vector>
@@ -85,22 +86,49 @@ namespace
 
         return asm_line;
     }
+
+    struct sim86_arguments
+    {
+        const char* input_path = nullptr;
+        bool execute_mode = false;
+    };
 }
 
 int main(int argc, char* argv[])
 {
-    constexpr int expected_args = 2;
-    if (argc != expected_args)
+    // read command line arguments
+    constexpr int min_expected_args = 2;
+    constexpr const char* usage_message = "Usage: InstructionDecode8086 [-exec] input_file";
+
+    if (argc < min_expected_args)
     {
-        std::cout << "Usage: InstructionDecode8086 input_file\n";
+        std::cout << usage_message << '\n';
         return 1;
+    }
+
+    sim86_arguments app_args{};
+    if (argc == min_expected_args)
+    {
+        app_args.input_path = argv[1];
+    }
+    else
+    {
+        if (std::strcmp(argv[1], "-exec") == 0)
+        {
+            app_args.execute_mode = true;
+            app_args.input_path = argv[2];
+        }
+        else
+        {
+            std::cout << "Unrecognized argument '" << argv[1] << "'.\n\n" << usage_message << '\n';
+            return 1;
+        }
     }
 
     try
     {
         // read binary file
-        const char* input_path = argv[1];
-        const std::vector<uint8_t> data = read_binary_file(input_path);
+        const std::vector<uint8_t> data = read_binary_file(app_args.input_path);
 
         // read instructions
         auto data_iter = data.cbegin();
@@ -110,6 +138,7 @@ int main(int argc, char* argv[])
 
         while (data_iter != data_end)
         {
+            // decode instruction
             std::optional<instruction> inst_result = decode_instruction(data_iter, data_end);
             if (!inst_result.has_value())
                 continue;
