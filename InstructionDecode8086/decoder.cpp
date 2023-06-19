@@ -387,6 +387,8 @@ char const* get_mneumonic(operation_type type)
 
 std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end)
 {
+    const data_iterator initial_position = data_iter;
+
     instruction_fields fields{};
 
     uint8_t b = 0;
@@ -529,6 +531,10 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
         return {};
     }
 
+    const data_iterator final_position = data_iter;
+
+    fields.size = static_cast<uint16_t>(std::distance(initial_position, final_position));
+
     return fields;
 }
 
@@ -536,9 +542,10 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
 {
     instruction inst;
     inst.op = opcode_translation[fields.opcode];
+    inst.size = fields.size;
+    inst.flags |= fields.w ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
 
-    const bool wide_data = (fields.w && !fields.s);
-    const uint32_t data_size = wide_data ? 2 : 1;
+    const uint32_t data_size = (!fields.s && fields.w) ? 2 : 1;
 
     switch (fields.opcode)
     {
@@ -549,7 +556,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         if (fields.mod == 0b11) // register mode
         {
-            inst.size = 2;
             inst.operands[0] = register_access
             {
                 .index = (fields.d ? fields.reg : fields.rm) + 8U * fields.w,
@@ -566,9 +572,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         else // memory mode
         {
             const auto address = get_instruction_memory(fields);
-
-            inst.size = wide_data ? 4 : 3;
-            inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
 
             if (fields.d)
             {
@@ -594,14 +597,11 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         break;
     }
 
-    case opcode::mov_immediate_to_register_or_memory:
     case opcode::add_immediate_to_register_or_memory:
     case opcode::sub_immediate_from_register_or_memory:
     case opcode::cmp_immediate_with_register_or_memory:
+    case opcode::mov_immediate_to_register_or_memory:
     {
-        inst.size = wide_data ? 4 : 3;
-        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
-
         if (fields.mod == 0b11) // register mode
         {
             inst.operands[0] = register_access
@@ -634,9 +634,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     case opcode::sub_immediate_from_accumulator:
     case opcode::cmp_immediate_with_accumulator:
     {
-        inst.size = wide_data ? 4 : 3;
-        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
-
         inst.operands[0] = register_access
         {
             .index = fields.reg + 8U * fields.w,
@@ -653,9 +650,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
 
     case opcode::mov_memory_to_accumulator:
     {
-        inst.size = wide_data ? 4 : 3;
-        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
-
         inst.operands[0] = register_access
         {
             .index = fields.w ? 8U : 0,
@@ -671,9 +665,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
 
     case opcode::mov_accumulator_to_memory:
     {
-        inst.size = wide_data ? 4 : 3;
-        inst.flags |= wide_data ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
-
         inst.operands[0] = direct_address
         {
             .address = get_instruction_address(fields),
@@ -713,12 +704,10 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     case opcode::loopnz:
     case opcode::jcxz:
     {
-        inst.size = 2;
-        inst.operands[0] = register_access
+        inst.operands[0] = immediate
         {
-            .index = fields.reg + 8U * fields.w,
-            .offset = 0,
-            .count = 1
+            .value = get_instruction_data(fields),
+            .flags = static_cast<uint8_t>(immediate_flag::immediate_relative_jump_displacement)
         };
         break;
     }

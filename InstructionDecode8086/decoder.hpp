@@ -98,7 +98,7 @@ struct immediate
     uint32_t flags{};
 };
 
-using instruction_operand = std::variant<std::monostate, direct_address, effective_address_expression, register_access, immediate>;
+using instruction_operand = std::variant<std::monostate, effective_address_expression, direct_address, register_access, immediate>;
 
 struct instruction
 {
