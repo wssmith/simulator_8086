@@ -14,6 +14,12 @@
 
 namespace
 {
+    struct sim86_arguments
+    {
+        const char* input_path = nullptr;
+        bool execute_mode = false;
+    };
+
     std::vector<uint8_t> read_binary_file(const std::string& path)
     {
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
@@ -86,12 +92,6 @@ namespace
 
         return asm_line;
     }
-
-    struct sim86_arguments
-    {
-        const char* input_path = nullptr;
-        bool execute_mode = false;
-    };
 }
 
 int main(int argc, char* argv[])
@@ -134,22 +134,34 @@ int main(int argc, char* argv[])
         auto data_iter = data.cbegin();
         const auto data_end = data.cend();
 
+        std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
+        // decode instruction
         while (data_iter != data_end)
         {
-            // decode instruction
             std::optional<instruction> inst_result = decode_instruction(data_iter, data_end);
             if (!inst_result.has_value())
                 continue;
 
-            instruction inst = inst_result.value();
+            instruction_list.push_back(inst_result.value());
+
+            instruction& inst = instruction_list.back();
             inst.address = current_address;
             current_address += inst.size;
+        }
 
-            // print instructions
+        // print instructions
+        for (const instruction& inst : instruction_list)
+        {
             std::string asm_line = print_instruction(inst);
             std::cout << asm_line << '\n';
+        }
+
+        if (app_args.execute_mode)
+        {
+            // execute instructions
+            
         }
     }
     catch (std::exception& ex)
