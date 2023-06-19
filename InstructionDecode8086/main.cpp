@@ -96,8 +96,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    // todo: keep track of address
-
     try
     {
         // read binary file
