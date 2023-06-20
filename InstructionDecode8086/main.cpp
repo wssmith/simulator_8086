@@ -80,7 +80,7 @@ namespace
             },
             [](const register_access& register_op) { return std::string(get_register_name(register_op)); },
             [](immediate immediate_op) { return std::to_string(immediate_op.value); },
-            [](std::monostate) { return std::string(); },
+            [](std::monostate) { return std::string(); }
         };
 
         const std::string first_operand = std::visit(match_operand, inst.operands[0]);
@@ -137,6 +137,9 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
+        constexpr size_t register_count = 13;
+        uint16_t registers[register_count] = { };
+
         // decode instruction
         while (data_iter != data_end)
         {
@@ -149,19 +152,28 @@ int main(int argc, char* argv[])
             instruction& inst = instruction_list.back();
             inst.address = current_address;
             current_address += inst.size;
-        }
 
-        // print instructions
-        for (const instruction& inst : instruction_list)
-        {
+            // print instruction
             std::string asm_line = print_instruction(inst);
             std::cout << asm_line << '\n';
-        }
 
-        if (app_args.execute_mode)
-        {
-            // execute instructions
-            
+            // execute instruction?
+            if (app_args.execute_mode)
+            {
+                auto matcher = overloaded
+                {
+                    [](const effective_address_expression&) { return 0; },
+                    [](direct_address) { return 0; },
+                    [](const register_access&) { return 0; },
+                    [](immediate operand) { return operand.value; },
+                    [](std::monostate) { return 0; }
+                };
+
+                if (register_access* destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+                {
+                    int32_t source_value = std::visit(matcher, inst.operands[1]);
+                }
+            }
         }
     }
     catch (std::exception& ex)

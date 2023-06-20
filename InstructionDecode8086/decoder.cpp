@@ -14,12 +14,34 @@ namespace
 {
     constexpr std::array registers =
     {
-        "al", "cl", "dl", "bl",
-        "ah", "ch", "dh", "bh",
-        "ax", "cx", "dx", "bx",
-        "sp", "bp", "si", "di",
-        "es", "cs", "ss", "ds",
-        "ip"
+        std::array{ "ax", "ah", "al" },
+        std::array{ "bx", "bh", "bl" },
+        std::array{ "cx", "ch", "cl" },
+        std::array{ "dx", "dh", "dl" },
+        std::array{ "sp", "sp", "sp" },
+        std::array{ "bp", "bp", "bp" },
+        std::array{ "si", "si", "si" },
+        std::array{ "di", "di", "di" },
+        std::array{ "cs", "cs", "cs" },
+        std::array{ "ds", "ds", "ds" },
+        std::array{ "ss", "ss", "ss" },
+        std::array{ "es", "es", "es" },
+        std::array{ "ip", "ip", "ip" },
+    };
+
+    constexpr std::array<uint8_t, 16> register_index_map =
+    {
+        0, 2, 3, 1, 0, 2, 3, 1, 0, 2, 3, 1, 4, 5, 6, 7
+    };
+
+    constexpr std::array<uint8_t, 16> register_offset_map =
+    {
+        0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0
+    };
+
+    constexpr std::array<uint8_t, 16> register_count_map =
+    {
+        1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2
     };
 
     std::unordered_map<operation_type, const char*> mnemonics
@@ -52,14 +74,14 @@ namespace
 
     constexpr std::array<std::pair<register_access, std::optional<register_access>>, 8> effective_addresses =
     {
-        std::pair{ register_access{11, 0, 1}, register_access{14, 0, 1} }, // bx + si
-        std::pair{ register_access{11, 0, 1}, register_access{15, 0, 1} }, // bx + di
-        std::pair{ register_access{13, 0, 1}, register_access{14, 0, 1} }, // bp + si
-        std::pair{ register_access{13, 0, 1}, register_access{15, 0, 1} }, // bp + di
-        std::pair{ register_access{14, 0, 1}, std::optional<register_access>{} }, // si
-        std::pair{ register_access{15, 0, 2}, std::optional<register_access>{} }, // di
-        std::pair{ register_access{13, 0, 2}, std::optional<register_access>{} }, // bp
-        std::pair{ register_access{11, 0, 2}, std::optional<register_access>{} }  // bx
+        std::pair{ register_access{1, 0, 2}, register_access{6, 0, 2} }, // bx + si
+        std::pair{ register_access{1, 0, 2}, register_access{7, 0, 2} }, // bx + di
+        std::pair{ register_access{5, 0, 2}, register_access{6, 0, 2} }, // bp + si
+        std::pair{ register_access{5, 0, 2}, register_access{7, 0, 2} }, // bp + di
+        std::pair{ register_access{6, 0, 2}, std::optional<register_access>{} }, // si
+        std::pair{ register_access{7, 0, 2}, std::optional<register_access>{} }, // di
+        std::pair{ register_access{5, 0, 2}, std::optional<register_access>{} }, // bp
+        std::pair{ register_access{1, 0, 2}, std::optional<register_access>{} }  // bx
     };
 
     constexpr const char* mov_name = "mov";
@@ -377,7 +399,7 @@ namespace
 
 char const* get_register_name(const register_access& reg_access)
 {
-    return registers[reg_access.index + reg_access.offset];
+    return registers[reg_access.index][reg_access.offset + (reg_access.count == 1)];
 }
 
 char const* get_mneumonic(operation_type type)
@@ -556,42 +578,43 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         if (fields.mod == 0b11) // register mode
         {
+            const size_t op1_index = (fields.d ? fields.reg : fields.rm) + 8U * fields.w;
             inst.operands[0] = register_access
             {
-                .index = (fields.d ? fields.reg : fields.rm) + 8U * fields.w,
-                .offset = 0,
-                .count = data_size
+                .index = register_index_map[op1_index],
+                .offset = register_offset_map[op1_index],
+                .count = register_count_map[op1_index]
             };
+
+            const size_t op2_index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w;
             inst.operands[1] = register_access
             {
-                .index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w,
-                .offset = 0,
-                .count = data_size
+                .index = register_index_map[op2_index],
+                .offset = register_offset_map[op2_index],
+                .count = register_count_map[op2_index]
             };
         }
         else // memory mode
         {
             const auto address = get_instruction_memory(fields);
+            const size_t op_index = fields.reg + 8U * fields.w;
+
+            register_access reg
+            {
+                .index = register_index_map[op_index],
+                .offset = register_offset_map[op_index],
+                .count = register_count_map[op_index]
+            };
 
             if (fields.d)
             {
-                inst.operands[0] = register_access
-                {
-                    .index = fields.reg + 8U * fields.w,
-                    .offset = 0,
-                    .count = data_size
-                };
+                inst.operands[0] = reg;
                 inst.operands[1] = address;
             }
             else
             {
                 inst.operands[0] = address;
-                inst.operands[1] = register_access
-                {
-                    .index = fields.reg + 8U * fields.w,
-                    .offset = 0,
-                    .count = data_size
-                };
+                inst.operands[1] = reg;
             }
         }
         break;
@@ -604,11 +627,12 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         if (fields.mod == 0b11) // register mode
         {
+            const size_t op_index = fields.rm + 8U * fields.w;
             inst.operands[0] = register_access
             {
-                .index = fields.rm + 8U * fields.w,
-                .offset = 0,
-                .count = data_size
+                .index = register_index_map[op_index],
+                .offset = register_offset_map[op_index],
+                .count = register_count_map[op_index]
             };
             inst.operands[1] = immediate
             {
@@ -634,11 +658,12 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     case opcode::sub_immediate_from_accumulator:
     case opcode::cmp_immediate_with_accumulator:
     {
+        const size_t op_index = fields.reg + 8U * fields.w;
         inst.operands[0] = register_access
         {
-            .index = fields.reg + 8U * fields.w,
-            .offset = 0,
-            .count = data_size
+            .index = register_index_map[op_index],
+            .offset = register_offset_map[op_index],
+            .count = register_count_map[op_index]
         };
         inst.operands[1] = immediate
         {
@@ -650,11 +675,12 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
 
     case opcode::mov_memory_to_accumulator:
     {
+        const size_t op_index = fields.w ? 8U : 0;
         inst.operands[0] = register_access
         {
-            .index = fields.w ? 8U : 0,
-            .offset = 0,
-            .count = data_size
+            .index = register_index_map[op_index],
+            .offset = register_offset_map[op_index],
+            .count = register_count_map[op_index]
         };
         inst.operands[1] = direct_address
         {
@@ -669,11 +695,13 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         {
             .address = get_instruction_address(fields),
         };
+
+        const size_t op_index = fields.w ? 8U : 0;
         inst.operands[1] = register_access
         {
-            .index = fields.w ? 8U : 0,
-            .offset = 0,
-            .count = data_size
+            .index = register_index_map[op_index],
+            .offset = register_offset_map[op_index],
+            .count = register_count_map[op_index]
         };
         break;
     }
