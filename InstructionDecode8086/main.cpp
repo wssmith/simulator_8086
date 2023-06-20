@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <fstream>
 #include <ios>
+#include <iomanip>
 #include <iostream>
 #include <iterator>
 #include <optional>
@@ -137,8 +138,8 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
-        constexpr size_t register_count = 13;
-        uint16_t registers[register_count] = { };
+        constexpr size_t register_count = 8;
+        std::array<uint16_t, register_count> registers{ };
 
         // decode instruction
         while (data_iter != data_end)
@@ -155,25 +156,43 @@ int main(int argc, char* argv[])
 
             // print instruction
             std::string asm_line = print_instruction(inst);
-            std::cout << asm_line << '\n';
+            std::cout << asm_line;
 
             // execute instruction?
             if (app_args.execute_mode)
             {
                 auto matcher = overloaded
                 {
-                    [](const effective_address_expression&) { return 0; },
-                    [](direct_address) { return 0; },
-                    [](const register_access&) { return 0; },
-                    [](immediate operand) { return operand.value; },
-                    [](std::monostate) { return 0; }
+                    [](const effective_address_expression&) -> uint16_t { return 0; },
+                    [](direct_address) -> uint16_t { return 0; },
+                    [&registers](const register_access& operand) { return registers[operand.index]; },
+                    [](immediate operand) { return static_cast<uint16_t>(operand.value); },
+                    [](std::monostate) -> uint16_t { return 0; }
                 };
 
-                if (register_access* destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+                if (const register_access* destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
                 {
-                    int32_t source_value = std::visit(matcher, inst.operands[1]);
+                    const uint16_t old_value = registers[destination->index];
+                    const uint16_t new_value = std::visit(matcher, inst.operands[1]);
+
+                    registers[destination->index] = new_value;
+                    char const* destination_register = get_register_name(*destination);
+
+                    std::cout << " ; " << destination_register << ":" << "0x" << std::hex << old_value << "->" << "0x" << new_value << std::dec;
                 }
             }
+
+            std::cout << '\n';
+        }
+
+        // print final contents of registers
+        std::cout << "\nFinal registers:\n";
+        for (size_t i = 0; i < registers.size(); ++i)
+        {
+            const uint16_t reg_value = registers[i];
+            char const* register_name = get_register_name(register_access{ .index = i, .offset = 0, .count = 2 });
+
+            std::cout << '\t' << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
         }
     }
     catch (std::exception& ex)
