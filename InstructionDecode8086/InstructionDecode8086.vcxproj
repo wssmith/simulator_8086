@@ -132,12 +132,14 @@
   <ItemGroup>
     <ClCompile Include="decoder.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="simulator.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="decoder.hpp" />
     <ClInclude Include="instruction_fields.hpp" />
     <ClInclude Include="opcode.hpp" />
     <ClInclude Include="overloaded.hpp" />
+    <ClInclude Include="simulator.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
