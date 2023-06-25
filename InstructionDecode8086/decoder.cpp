@@ -27,6 +27,7 @@ namespace
         std::array{ "ss", "ss", "ss" },
         std::array{ "es", "es", "es" },
         std::array{ "ip", "ip", "ip" },
+        std::array{ "flags", "flags", "flags" }
     };
 
     constexpr std::array<uint8_t, 16> register_index_map =
@@ -528,7 +529,7 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     instruction inst;
     inst.op = opcode_translation[fields.opcode];
     inst.size = fields.size;
-    inst.flags |= fields.w ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
+    inst.flags |= fields.w ? static_cast<uint8_t>(instruction_flags::wide) : 0U;
 
     switch (fields.opcode)
     {
@@ -657,7 +658,7 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         inst.operands[0] = immediate
         {
             .value = get_instruction_data(fields),
-            .flags = static_cast<uint8_t>(immediate_flag::immediate_relative_jump_displacement)
+            .flags = static_cast<uint8_t>(immediate_flags::relative_jump_displacement)
         };
         break;
     }

@@ -49,6 +49,8 @@ enum class opcode : uint16_t
     loopz,
     loopnz,
     jcxz,
+
+    count
 };
 
 #endif

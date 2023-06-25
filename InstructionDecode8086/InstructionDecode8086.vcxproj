@@ -135,6 +135,7 @@
     <ClCompile Include="simulator.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="control_flags.hpp" />
     <ClInclude Include="decoder.hpp" />
     <ClInclude Include="instruction_fields.hpp" />
     <ClInclude Include="opcode.hpp" />

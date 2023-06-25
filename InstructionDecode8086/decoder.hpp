@@ -45,14 +45,15 @@ enum class operation_type : uint32_t
     op_count,
 };
 
-enum class instruction_flag
+enum class instruction_flags : uint16_t
 {
-    inst_lock = 0x1,
-    inst_rep = 0x2,
-    inst_segment = 0x4,
-    inst_wide = 0x8,
-    inst_far = 0x10,
-    inst_rep_ne = 0x20,
+    none = 0,
+    lock = 1 << 0,
+    rep = 1 << 1,
+    segment = 1 << 2,
+    wide = 1 << 3,
+    far = 1 << 4,
+    rep_ne = 1 << 5,
 };
 
 struct direct_address
@@ -73,9 +74,10 @@ struct effective_address_term
     int32_t scale{};
 };
 
-enum class effective_address_flag
+enum class effective_address_flags : uint16_t
 {
-    address_explicit_segment = 0x1,
+    none = 0,
+    segment = 1 << 0,
 };
 
 struct effective_address_expression
@@ -87,9 +89,10 @@ struct effective_address_expression
     uint32_t flags{};
 };
 
-enum class immediate_flag
+enum class immediate_flags : uint16_t
 {
-    immediate_relative_jump_displacement = 0x1,
+    none = 0,
+    relative_jump_displacement = 1 << 0,
 };
 
 struct immediate

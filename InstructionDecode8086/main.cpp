@@ -10,6 +10,7 @@
 #include <string>
 #include <vector>
 
+#include "control_flags.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
 #include "simulator.hpp"
@@ -49,7 +50,7 @@ namespace
 
                 if (std::holds_alternative<immediate>(inst.operands[1]))
                 {
-                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flag::inst_wide)) != 0;
+                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flags::wide)) != 0;
                     address_text += (is_word ? "word " : "byte ");
                 }
 
@@ -72,7 +73,7 @@ namespace
 
                 if (std::holds_alternative<immediate>(inst.operands[1]))
                 {
-                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flag::inst_wide)) != 0;
+                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flags::wide)) != 0;
                     direct_address_text += (is_word ? "word " : "byte ");
                 }
 
@@ -93,6 +94,19 @@ namespace
             asm_line += ", " + second_operand;
 
         return asm_line;
+    }
+
+    std::string get_flag_string(control_flags flags)
+    {
+        std::string flag_string;
+
+        if (has_any_flag(flags, control_flags::zero))
+            flag_string += "Z";
+
+        if (has_any_flag(flags, control_flags::sign))
+            flag_string += "S";
+
+        return flag_string;
     }
 }
 
@@ -164,7 +178,17 @@ int main(int argc, char* argv[])
                 simulation_step step = simulate_instruction(inst, registers);
                 const char* destination_register = get_register_name(step.destination);
 
-                std::cout << " ; " << destination_register << ":" << "0x" << std::hex << step.old_value << "->" << "0x" << step.new_value << std::dec;
+                std::cout << " ; ";
+
+                if (step.new_value != step.old_value)
+                {
+                    std::cout << destination_register << ":" << "0x" << std::hex << step.old_value << "->" << "0x" << step.new_value << std::dec;
+                }
+
+                if (step.new_flags != step.old_flags)
+                {
+                    std::cout << " flags:" << get_flag_string(step.old_flags) << "->" << get_flag_string(step.new_flags);
+                }
             }
 
             std::cout << '\n';
@@ -177,9 +201,21 @@ int main(int argc, char* argv[])
             for (size_t i = 0; i < registers.size(); ++i)
             {
                 const uint16_t reg_value = registers[i];
+                if (reg_value == 0)
+                    continue;
+
                 char const* register_name = get_register_name(register_access{ .index = i, .offset = 0, .count = 2 });
 
-                std::cout << '\t' << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
+                if (i == flags_register_index)
+                {
+                    const auto flags = static_cast<control_flags>(registers[flags_register_index]);
+
+                    std::cout << "   " << register_name << ": " << get_flag_string(flags) << '\n';
+                }
+                else
+                {
+                    std::cout << "      " << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
+                }
             }
         }
     }
