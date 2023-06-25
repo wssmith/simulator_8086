@@ -36,7 +36,7 @@ namespace
 
     constexpr std::array<uint8_t, 16> register_offset_map =
     {
-        0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0
+        1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
     };
 
     constexpr std::array<uint8_t, 16> register_count_map =
@@ -44,7 +44,7 @@ namespace
         1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2
     };
 
-    constexpr std::array<uint8_t, 4> segment_register_index_map = { 0, 1, 2, 3 };
+    constexpr std::array<uint8_t, 4> segment_register_index_map = { 11, 8, 10, 9 };
 
     std::unordered_map<operation_type, const char*> mnemonics
     {
@@ -84,55 +84,6 @@ namespace
         std::pair{ register_access{7, 0, 2}, std::optional<register_access>{} }, // di
         std::pair{ register_access{5, 0, 2}, std::optional<register_access>{} }, // bp
         std::pair{ register_access{1, 0, 2}, std::optional<register_access>{} }  // bx
-    };
-
-    constexpr const char* mov_name = "mov";
-    constexpr const char* add_name = "add";
-    constexpr const char* sub_name = "sub";
-    constexpr const char* cmp_name = "cmp";
-
-    std::unordered_map<opcode, const char*> opcodes
-    {
-        { opcode::mov_normal, mov_name },
-        { opcode::mov_immediate_to_register_or_memory, mov_name },
-        { opcode::mov_immediate_to_register, mov_name },
-        { opcode::mov_memory_to_accumulator, mov_name },
-        { opcode::mov_accumulator_to_memory, mov_name },
-        { opcode::mov_to_segment_register, mov_name },
-        { opcode::mov_from_segment_register, mov_name },
-
-        { opcode::add_normal, add_name },
-        { opcode::add_immediate_to_register_or_memory, add_name },
-        { opcode::add_immediate_to_accumulator, add_name },
-
-        { opcode::sub_normal, sub_name },
-        { opcode::sub_immediate_from_register_or_memory, sub_name },
-        { opcode::sub_immediate_from_accumulator, sub_name },
-
-        { opcode::cmp_normal, cmp_name },
-        { opcode::cmp_immediate_with_register_or_memory, cmp_name },
-        { opcode::cmp_immediate_with_accumulator, cmp_name },
-
-        { opcode::je, "je" },
-        { opcode::jl, "jl" },
-        { opcode::jle, "jle" },
-        { opcode::jb, "jb" },
-        { opcode::jbe, "jbe" },
-        { opcode::jp, "jp" },
-        { opcode::jo, "jo" },
-        { opcode::js, "js" },
-        { opcode::jne, "jne" },
-        { opcode::jnl, "jnl" },
-        { opcode::jg, "jg" },
-        { opcode::jnb, "jnb" },
-        { opcode::ja, "ja" },
-        { opcode::jnp, "jnp" },
-        { opcode::jno, "jno" },
-        { opcode::jns, "jns" },
-        { opcode::loop, "loop" },
-        { opcode::loopz, "loopz" },
-        { opcode::loopnz, "loopnz" },
-        { opcode::jcxz, "jcxz" }
     };
 
     std::unordered_map<opcode, operation_type> opcode_translation
@@ -397,6 +348,16 @@ namespace
             return effective_address;
         }
     }
+
+    register_access get_register_from_index(size_t index)
+    {
+        return register_access
+        {
+            .index = register_index_map[index],
+            .offset = register_offset_map[index],
+            .count = register_count_map[index]
+        };
+    }
 }
 
 char const* get_register_name(const register_access& reg_access)
@@ -470,10 +431,10 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
             {
                 switch (op)
                 {
-                case 0b000: return opcode::add_immediate_to_register_or_memory;
-                case 0b101: return opcode::sub_immediate_from_register_or_memory;
-                case 0b111: return opcode::cmp_immediate_with_register_or_memory;
-                default:    return opcode::none;
+                    case 0b000: return opcode::add_immediate_to_register_or_memory;
+                    case 0b101: return opcode::sub_immediate_from_register_or_memory;
+                    case 0b111: return opcode::cmp_immediate_with_register_or_memory;
+                    default:    return opcode::none;
                 }
             }();
         }
@@ -578,33 +539,17 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         if (fields.mod == 0b11) // register mode
         {
-            const size_t op1_index = (fields.d ? fields.reg : fields.rm) + 8U * fields.w;
-            inst.operands[0] = register_access
-            {
-                .index = register_index_map[op1_index],
-                .offset = register_offset_map[op1_index],
-                .count = register_count_map[op1_index]
-            };
+            const size_t op1_index = fields.rm + 8 * fields.w;
+            inst.operands[fields.d] = get_register_from_index(op1_index);
 
-            const size_t op2_index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w;
-            inst.operands[1] = register_access
-            {
-                .index = register_index_map[op2_index],
-                .offset = register_offset_map[op2_index],
-                .count = register_count_map[op2_index]
-            };
+            const size_t op2_index = fields.reg + 8 * fields.w;
+            inst.operands[!fields.d] = get_register_from_index(op2_index);
         }
         else // memory mode
         {
-            const size_t op_index = fields.reg + 8U * fields.w;
-            inst.operands[fields.d] = register_access
-            {
-                .index = register_index_map[op_index],
-                .offset = register_offset_map[op_index],
-                .count = register_count_map[op_index]
-            };
-
-            inst.operands[!fields.d] = get_address_operand(fields);
+            const size_t op_index = fields.reg + 8 * fields.w;
+            inst.operands[fields.d] = get_address_operand(fields);
+            inst.operands[!fields.d] = get_register_from_index(op_index);
         }
         break;
     }
@@ -616,28 +561,18 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         if (fields.mod == 0b11) // register mode
         {
-            const size_t op_index = fields.rm + 8U * fields.w;
-            inst.operands[0] = register_access
-            {
-                .index = register_index_map[op_index],
-                .offset = register_offset_map[op_index],
-                .count = register_count_map[op_index]
-            };
-            inst.operands[1] = immediate
-            {
-                .value = get_instruction_data(fields),
-                .flags = 0
-            };
+            const size_t op_index = fields.rm + 8 * fields.w;
+            inst.operands[0] = get_register_from_index(op_index);
         }
         else // memory mode
         {
             inst.operands[0] = get_address_operand(fields);
-            inst.operands[1] = immediate
-            {
-                .value = get_instruction_data(fields),
-                .flags = 0
-            };
         }
+
+        inst.operands[1] = immediate
+        {
+            .value = get_instruction_data(fields)
+        };
         break;
     }
 
@@ -646,17 +581,11 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     case opcode::sub_immediate_from_accumulator:
     case opcode::cmp_immediate_with_accumulator:
     {
-        const size_t op_index = fields.reg + 8U * fields.w;
-        inst.operands[0] = register_access
-        {
-            .index = register_index_map[op_index],
-            .offset = register_offset_map[op_index],
-            .count = register_count_map[op_index]
-        };
+        const size_t op_index = fields.reg + 8 * fields.w;
+        inst.operands[0] = get_register_from_index(op_index);
         inst.operands[1] = immediate
         {
-            .value = get_instruction_data(fields),
-            .flags = 0
+            .value = get_instruction_data(fields)
         };
         break;
     }
@@ -666,13 +595,8 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     {
         const bool to_memory = (fields.opcode == opcode::mov_accumulator_to_memory);
 
-        const size_t op_index = fields.w ? 8U : 0;
-        inst.operands[to_memory] = register_access
-        {
-            .index = register_index_map[op_index],
-            .offset = register_offset_map[op_index],
-            .count = register_count_map[op_index]
-        };
+        const size_t op_index = fields.w ? 8 : 0;
+        inst.operands[to_memory] = get_register_from_index(op_index);
         inst.operands[!to_memory] = direct_address
         {
             .address = get_instruction_address(fields),
@@ -694,12 +618,12 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
 
         if (fields.mod == 0b11) // register mode
         {
-            const size_t op2_index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w;
+            const size_t non_segment_index = fields.rm + 8;
             inst.operands[!from_segment] = register_access
             {
-                .index = register_index_map[op2_index],
-                .offset = register_offset_map[op2_index],
-                .count = register_count_map[op2_index]
+                .index = register_index_map[non_segment_index],
+                .offset = 0,
+                .count = 2
             };
         }
         else // memory mode
