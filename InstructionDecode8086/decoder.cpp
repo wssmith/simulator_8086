@@ -44,6 +44,8 @@ namespace
         1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2
     };
 
+    constexpr std::array<uint8_t, 4> segment_register_index_map = { 0, 1, 2, 3 };
+
     std::unordered_map<operation_type, const char*> mnemonics
     {
         { operation_type::op_mov, "mov" },
@@ -266,18 +268,18 @@ namespace
         return true;
     }
 
-    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& inst)
+    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
     {
-        const int8_t displacement_bytes = get_displacement_bytes(inst.mod, inst.rm);
+        const int8_t displacement_bytes = get_displacement_bytes(fields.mod, fields.rm);
 
         if (displacement_bytes > 0)
         {
-            if (!read_and_advance(iter, iter_end, inst.disp_lo))
+            if (!read_and_advance(iter, iter_end, fields.disp_lo))
                 return false;
 
             if (displacement_bytes > 1)
             {
-                if (!read_and_advance(iter, iter_end, inst.disp_hi))
+                if (!read_and_advance(iter, iter_end, fields.disp_hi))
                     return false;
             }
         }
@@ -285,37 +287,37 @@ namespace
         return true;
     }
 
-    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction_fields& inst)
+    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
     {
-        if (!read_and_advance(iter, iter_end, inst.data_lo))
+        if (!read_and_advance(iter, iter_end, fields.data_lo))
             return false;
 
-        if (inst.w && !inst.s)
+        if (fields.w && !fields.s)
         {
-            if (!read_and_advance(iter, iter_end, inst.data_hi))
+            if (!read_and_advance(iter, iter_end, fields.data_hi))
                 return false;
         }
 
         return true;
     }
 
-    int16_t get_instruction_data(const instruction_fields& inst)
+    int16_t get_instruction_data(const instruction_fields& fields)
     {
-        if (inst.w && !inst.s)
-            return static_cast<int16_t>(inst.data_lo + (inst.data_hi << 8));
+        if (fields.w && !fields.s)
+            return static_cast<int16_t>(fields.data_lo + (fields.data_hi << 8));
         else
-            return static_cast<int8_t>(inst.data_lo);
+            return static_cast<int8_t>(fields.data_lo);
     }
 
-    uint16_t get_instruction_address(const instruction_fields& inst)
+    uint16_t get_instruction_address(const instruction_fields& fields)
     {
-        if (inst.w && !inst.s)
-            return static_cast<uint16_t>(inst.data_lo + (inst.data_hi << 8));
+        if (fields.w && !fields.s)
+            return static_cast<uint16_t>(fields.data_lo + (fields.data_hi << 8));
         else
-            return static_cast<uint8_t>(inst.data_lo);
+            return static_cast<uint8_t>(fields.data_lo);
     }
 
-    int16_t get_instruction_displacement(const instruction_fields& inst, int8_t bytes)
+    int16_t get_instruction_displacement(const instruction_fields& fields, int8_t bytes)
     {
         switch (bytes)
         {
@@ -323,13 +325,13 @@ namespace
         default:
             return 0;
         case 1:
-            return static_cast<int8_t>(inst.disp_lo);
+            return static_cast<int8_t>(fields.disp_lo);
         case 2:
-            return static_cast<int16_t>((inst.disp_hi << 8) + inst.disp_lo);
+            return static_cast<int16_t>((fields.disp_hi << 8) + fields.disp_lo);
         }
     }
 
-    uint16_t get_instruction_direct_address(const instruction_fields& inst, int8_t bytes)
+    uint16_t get_instruction_direct_address(const instruction_fields& fields, int8_t bytes)
     {
         switch (bytes)
         {
@@ -337,21 +339,21 @@ namespace
         default:
             return 0;
         case 1:
-            return static_cast<uint8_t>(inst.disp_lo);
+            return static_cast<uint8_t>(fields.disp_lo);
         case 2:
-            return static_cast<uint16_t>((inst.disp_hi << 8) + inst.disp_lo);
+            return static_cast<uint16_t>((fields.disp_hi << 8) + fields.disp_lo);
         }
     }
 
-    instruction_operand get_instruction_memory(const instruction_fields& inst)
+    instruction_operand get_address_operand(const instruction_fields& fields)
     {
         int8_t displacement_bytes = 0;
         bool directAddress = false;
-        switch (inst.mod)
+        switch (fields.mod)
         {
         case 0b00: // direct address, 16-bit displacement
             displacement_bytes = 2;
-            directAddress = (inst.rm == 0b110);
+            directAddress = (fields.rm == 0b110);
             break;
 
         case 0b01: // memory mode, 8-bit displacement
@@ -365,17 +367,17 @@ namespace
         
         if (directAddress)
         {
-            const uint16_t address = get_instruction_direct_address(inst, displacement_bytes);
+            const uint16_t address = get_instruction_direct_address(fields, displacement_bytes);
             return direct_address{ .address = address };
         }
         else
         {
             effective_address_expression effective_address{};
 
-            const auto displacement = get_instruction_displacement(inst, displacement_bytes);
+            const auto displacement = get_instruction_displacement(fields, displacement_bytes);
             effective_address.displacement = displacement;
 
-            const auto& [term1, term2] = effective_addresses[inst.rm];
+            const auto& [term1, term2] = effective_addresses[fields.rm];
 
             effective_address.term1 = effective_address_term
             {
@@ -567,8 +569,6 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     inst.size = fields.size;
     inst.flags |= fields.w ? static_cast<uint8_t>(instruction_flag::inst_wide) : 0U;
 
-    const uint32_t data_size = (!fields.s && fields.w) ? 2 : 1;
-
     switch (fields.opcode)
     {
     case opcode::mov_normal:
@@ -596,26 +596,15 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         }
         else // memory mode
         {
-            const auto address = get_instruction_memory(fields);
             const size_t op_index = fields.reg + 8U * fields.w;
-
-            register_access reg
+            inst.operands[fields.d] = register_access
             {
                 .index = register_index_map[op_index],
                 .offset = register_offset_map[op_index],
                 .count = register_count_map[op_index]
             };
 
-            if (fields.d)
-            {
-                inst.operands[0] = reg;
-                inst.operands[1] = address;
-            }
-            else
-            {
-                inst.operands[0] = address;
-                inst.operands[1] = reg;
-            }
+            inst.operands[!fields.d] = get_address_operand(fields);
         }
         break;
     }
@@ -642,8 +631,7 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
         }
         else // memory mode
         {
-            const auto address = get_instruction_memory(fields);
-            inst.operands[0] = address;
+            inst.operands[0] = get_address_operand(fields);
             inst.operands[1] = immediate
             {
                 .value = get_instruction_data(fields),
@@ -674,42 +662,52 @@ std::optional<instruction> decode_instruction(const instruction_fields& fields)
     }
 
     case opcode::mov_memory_to_accumulator:
-    {
-        const size_t op_index = fields.w ? 8U : 0;
-        inst.operands[0] = register_access
-        {
-            .index = register_index_map[op_index],
-            .offset = register_offset_map[op_index],
-            .count = register_count_map[op_index]
-        };
-        inst.operands[1] = direct_address
-        {
-            .address = get_instruction_address(fields),
-        };
-        break;
-    }
-
     case opcode::mov_accumulator_to_memory:
     {
-        inst.operands[0] = direct_address
-        {
-            .address = get_instruction_address(fields),
-        };
+        const bool to_memory = (fields.opcode == opcode::mov_accumulator_to_memory);
 
         const size_t op_index = fields.w ? 8U : 0;
-        inst.operands[1] = register_access
+        inst.operands[to_memory] = register_access
         {
             .index = register_index_map[op_index],
             .offset = register_offset_map[op_index],
             .count = register_count_map[op_index]
+        };
+        inst.operands[!to_memory] = direct_address
+        {
+            .address = get_instruction_address(fields),
         };
         break;
     }
 
     case opcode::mov_to_segment_register:
     case opcode::mov_from_segment_register:
-        // todo
+    {
+        const bool from_segment = (fields.opcode == opcode::mov_from_segment_register);
+
+        inst.operands[from_segment] = register_access
+        {
+            .index = segment_register_index_map[fields.sr],
+            .offset = 0,
+            .count = 2
+        };
+
+        if (fields.mod == 0b11) // register mode
+        {
+            const size_t op2_index = (fields.d ? fields.rm : fields.reg) + 8U * fields.w;
+            inst.operands[!from_segment] = register_access
+            {
+                .index = register_index_map[op2_index],
+                .offset = register_offset_map[op2_index],
+                .count = register_count_map[op2_index]
+            };
+        }
+        else // memory mode
+        {
+            inst.operands[!from_segment] = get_address_operand(fields);
+        }
         break;
+    }
 
     case opcode::je:
     case opcode::jl:
