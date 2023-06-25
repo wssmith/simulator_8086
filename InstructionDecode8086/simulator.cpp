@@ -38,13 +38,20 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         const uint16_t old_value = registers[destination->index];
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
 
-        uint16_t new_value = op_value;
-        if (destination->count == 1)
+        uint16_t new_value = 0;
+        if (inst.op == operation_type::op_mov)
         {
-            if (destination->offset == 0)
-                new_value = (old_value & 0x00FF) + (op_value << 8);
+            if (destination->count == 1)
+            {
+                if (destination->offset == 0)
+                    new_value = (old_value & 0x00FF) + (op_value << 8);
+                else
+                    new_value = (old_value & 0xFF00) + op_value;
+            }
             else
-                new_value = (old_value & 0xFF00) + op_value;
+            {
+                new_value = op_value;
+            }
         }
 
         registers[destination->index] = new_value;
