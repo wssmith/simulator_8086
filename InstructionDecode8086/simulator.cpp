@@ -30,10 +30,6 @@ namespace
     {
         control_flags new_flags = control_flags::none;
 
-        int ones_count = 0;
-        for (size_t i = 0; i < 8; ++i)
-            ones_count += (value & (1 << i)) != 0;
-
         if ((std::popcount(static_cast<uint8_t>(value & 0xFF)) & 1) == 0)
             new_flags |= control_flags::parity;
 
