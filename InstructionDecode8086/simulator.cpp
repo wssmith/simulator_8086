@@ -155,12 +155,6 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         // write to registers
         registers[destination->index] = new_value;
 
-        // reset instruction pointer if the code segment changed, otherwise increment it
-        if (destination->index == code_segment_index && new_value != old_value)
-            registers[instruction_pointer_index] = 0;
-        else
-            ++registers[instruction_pointer_index];
-
         // update flags
         registers[flags_register_index] = static_cast<uint16_t>(new_flags);
 
@@ -173,6 +167,8 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             .new_flags = new_flags
         };
     }
+
+    registers[instruction_pointer_index] += inst.size;
 
     return step;
 }
