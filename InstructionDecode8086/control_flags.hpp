@@ -55,14 +55,14 @@ constexpr control_flags& operator^=(control_flags& f1, control_flags f2) noexcep
     return f1;
 }
 
-constexpr bool has_any_flag(control_flags this_flag, control_flags flags) noexcept
+constexpr bool has_any_flag(control_flags flag_to_test, control_flags flags) noexcept
 {
-    return (this_flag & flags) != control_flags::none;
+    return (flag_to_test & flags) != control_flags::none;
 }
 
-constexpr bool has_all_flags(control_flags this_flag, control_flags flags) noexcept
+constexpr bool has_all_flags(control_flags flag_to_test, control_flags flags) noexcept
 {
-    return (this_flag & flags) == flags;
+    return (flag_to_test & flags) == flags;
 }
 
 #endif

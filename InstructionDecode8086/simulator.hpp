@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cstdint>
+#include <string>
 
 #include "decoder.hpp"
 
@@ -23,6 +24,8 @@ inline constexpr int code_segment_index = 8;
 inline constexpr int instruction_pointer_index = 12;
 inline constexpr int flags_register_index = 13;
 inline constexpr int register_count = 14;
+
+std::string get_flag_string(control_flags flags);
 
 simulation_step simulate_instruction(const instruction& inst, std::array<uint16_t, register_count>& registers);
 

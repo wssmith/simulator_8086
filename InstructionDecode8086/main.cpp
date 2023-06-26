@@ -7,6 +7,7 @@
 #include <iostream>
 #include <iterator>
 #include <optional>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -96,17 +97,49 @@ namespace
         return asm_line;
     }
 
-    std::string get_flag_string(control_flags flags)
+    std::string print_simulation_step(const simulation_step& step)
     {
-        std::string flag_string;
+        std::ostringstream builder;
 
-        if (has_any_flag(flags, control_flags::zero))
-            flag_string += "Z";
+        if (step.new_value != step.old_value)
+        {
+            const char* destination_register = get_register_name(step.destination);
+            builder << destination_register << ":" << "0x" << std::hex << step.old_value << "->" << "0x" << step.new_value << std::dec << " ";
+        }
 
-        if (has_any_flag(flags, control_flags::sign))
-            flag_string += "S";
+        if (step.new_flags != step.old_flags)
+        {
+            builder << "flags:" << get_flag_string(step.old_flags) << "->" << get_flag_string(step.new_flags);
+        }
 
-        return flag_string;
+        return builder.str();
+    }
+
+    std::string print_register_contents(std::array<uint16_t, register_count> registers)
+    {
+        std::ostringstream builder;
+
+        for (size_t i = 0; i < registers.size(); ++i)
+        {
+            const uint16_t reg_value = registers[i];
+            if (reg_value == 0)
+                continue;
+
+            char const* register_name = get_register_name(register_access{ .index = i, .offset = 0, .count = 2 });
+
+            if (i == flags_register_index)
+            {
+                const auto flags = static_cast<control_flags>(registers[flags_register_index]);
+
+                builder << "   " << register_name << ": " << get_flag_string(flags) << '\n';
+            }
+            else
+            {
+                builder << "      " << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
+            }
+        }
+
+        return builder.str();
     }
 }
 
@@ -176,19 +209,9 @@ int main(int argc, char* argv[])
             if (app_args.execute_mode)
             {
                 simulation_step step = simulate_instruction(inst, registers);
-                const char* destination_register = get_register_name(step.destination);
+                std::string sim_line = print_simulation_step(step);
 
-                std::cout << " ; ";
-
-                if (step.new_value != step.old_value)
-                {
-                    std::cout << destination_register << ":" << "0x" << std::hex << step.old_value << "->" << "0x" << step.new_value << std::dec;
-                }
-
-                if (step.new_flags != step.old_flags)
-                {
-                    std::cout << " flags:" << get_flag_string(step.old_flags) << "->" << get_flag_string(step.new_flags);
-                }
+                std::cout << " ; " << sim_line;
             }
 
             std::cout << '\n';
@@ -197,26 +220,9 @@ int main(int argc, char* argv[])
         if (app_args.execute_mode)
         {
             // print final contents of registers
-            std::cout << "\nFinal registers:\n";
-            for (size_t i = 0; i < registers.size(); ++i)
-            {
-                const uint16_t reg_value = registers[i];
-                if (reg_value == 0)
-                    continue;
+            const std::string register_contents = print_register_contents(registers);
 
-                char const* register_name = get_register_name(register_access{ .index = i, .offset = 0, .count = 2 });
-
-                if (i == flags_register_index)
-                {
-                    const auto flags = static_cast<control_flags>(registers[flags_register_index]);
-
-                    std::cout << "   " << register_name << ": " << get_flag_string(flags) << '\n';
-                }
-                else
-                {
-                    std::cout << "      " << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
-                }
-            }
+            std::cout << "\nFinal registers:\n" << register_contents;
         }
     }
     catch (std::exception& ex)

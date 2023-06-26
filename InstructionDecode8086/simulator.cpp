@@ -1,11 +1,47 @@
 ﻿#include "simulator.hpp"
 
 #include <cstdint>
+#include <string>
+#include <unordered_map>
 #include <variant>
 
 #include "control_flags.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
+
+namespace
+{
+    std::unordered_map<control_flags, char> flag_names
+    {
+        { control_flags::carry, 'C' },
+        { control_flags::parity, 'P' },
+        { control_flags::aux_carry, 'A' },
+        { control_flags::zero, 'Z' },
+        { control_flags::sign, 'S' },
+        { control_flags::trap, 'T' },
+        { control_flags::interrupt, 'I' },
+        { control_flags::direction, 'D' },
+        { control_flags::overflow, 'O' },
+    };
+}
+
+std::string get_flag_string(control_flags flags)
+{
+    std::string flag_string;
+
+    uint16_t flag_value = 1;
+    while ((flag_value & 0xFFF) != 0)
+    {
+        auto flag_to_test = static_cast<control_flags>(flag_value);
+
+        if (flag_names.contains(flag_to_test) && has_any_flag(flag_to_test, flags))
+            flag_string += flag_names[flag_to_test];
+
+        flag_value <<= 1;
+    }
+
+    return flag_string;
+}
 
 simulation_step simulate_instruction(const instruction& inst, std::array<uint16_t, register_count>& registers)
 {
@@ -90,7 +126,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 else
                     new_flags &= ~control_flags::zero;
 
-                if ((result & 0b1000'0000'0000'0000) != 0)
+                if ((result & 0x8000) != 0)
                     new_flags |= control_flags::sign;
                 else
                     new_flags &= ~control_flags::sign;
