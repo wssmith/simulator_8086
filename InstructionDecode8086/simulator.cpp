@@ -95,6 +95,8 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     {
         const uint16_t old_value = registers[destination->index];
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+        const auto signed_old_value = static_cast<int16_t>(old_value);
+        const auto signed_op_value = static_cast<int16_t>(op_value);
         const bool wide_value = (destination->count == 2);
 
         const auto old_flags = static_cast<control_flags>(registers[flags_register_index]);
@@ -124,9 +126,9 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             {
                 int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
-                    result = static_cast<int16_t>(old_value) + (static_cast<int16_t>(op_value) << 8);
+                    result = signed_old_value + (signed_op_value << 8);
                 else
-                    result = static_cast<int16_t>(old_value) + static_cast<int16_t>(op_value);
+                    result = signed_old_value + signed_op_value;
 
                 new_flags = compute_flags(result, wide_value);
 
@@ -139,9 +141,9 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             {
                 int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
-                    result = static_cast<int16_t>(old_value) - (static_cast<int16_t>(op_value) << 8);
+                    result = signed_old_value - (signed_op_value << 8);
                 else
-                    result = static_cast<int16_t>(old_value) - static_cast<int16_t>(op_value);
+                    result = signed_old_value - signed_op_value;
 
                 new_flags = compute_flags(result, wide_value);
 
