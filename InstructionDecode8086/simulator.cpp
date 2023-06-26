@@ -1,6 +1,8 @@
 ﻿#include "simulator.hpp"
 
+#include <bit>
 #include <cstdint>
+#include <limits>
 #include <string>
 #include <unordered_map>
 #include <variant>
@@ -24,7 +26,7 @@ namespace
         { control_flags::overflow, 'O' },
     };
 
-    control_flags compute_flags(int32_t value)
+    control_flags compute_flags(int32_t value, bool wide_value)
     {
         control_flags new_flags = control_flags::none;
 
@@ -32,7 +34,7 @@ namespace
         for (size_t i = 0; i < 8; ++i)
             ones_count += (value & (1 << i)) != 0;
 
-        if ((ones_count & 1) == 0)
+        if ((std::popcount(static_cast<uint8_t>(value & 0xFF)) & 1) == 0)
             new_flags |= control_flags::parity;
 
         if (value == 0)
@@ -41,7 +43,10 @@ namespace
         if ((value & 0x8000) != 0)
             new_flags |= control_flags::sign;
 
-        if (value > 0x8000 || value < -0x8000)
+        const int min_value = wide_value ? std::numeric_limits<int16_t>::min() : std::numeric_limits<int8_t>::min();
+        const int max_value = wide_value ? std::numeric_limits<int16_t>::max() : std::numeric_limits<int8_t>::max();
+
+        if (value > max_value || value < min_value)
             new_flags |= control_flags::overflow;
 
         return new_flags;
@@ -94,6 +99,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     {
         const uint16_t old_value = registers[destination->index];
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+        const bool wide_value = (destination->count == 2);
 
         const auto old_flags = static_cast<control_flags>(registers[flags_register_index]);
 
@@ -126,7 +132,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 else
                     result = static_cast<int16_t>(old_value) + static_cast<int16_t>(op_value);
 
-                new_flags = compute_flags(result);
+                new_flags = compute_flags(result, wide_value);
 
                 new_value = static_cast<uint16_t>(result);
                 break;
@@ -141,7 +147,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 else
                     result = static_cast<int16_t>(old_value) - static_cast<int16_t>(op_value);
 
-                new_flags = compute_flags(result);
+                new_flags = compute_flags(result, wide_value);
 
                 if (inst.op == operation_type::op_sub)
                     new_value = static_cast<uint16_t>(result);
