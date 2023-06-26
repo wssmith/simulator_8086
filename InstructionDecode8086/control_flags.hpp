@@ -17,50 +17,50 @@ enum class control_flags : uint16_t
     overflow = 1 << 11
 };
 
-constexpr control_flags operator|(control_flags f1, control_flags f2) noexcept
+constexpr control_flags operator|(control_flags f1, control_flags f2)
 {
     return static_cast<control_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
 }
 
-constexpr control_flags operator&(control_flags f1, control_flags f2) noexcept
+constexpr control_flags operator&(control_flags f1, control_flags f2)
 {
     return static_cast<control_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
 }
 
-constexpr control_flags operator^(control_flags f1, control_flags f2) noexcept
+constexpr control_flags operator^(control_flags f1, control_flags f2)
 {
     return static_cast<control_flags>(static_cast<uint16_t>(f1) ^ static_cast<uint16_t>(f2));
 }
 
-constexpr control_flags operator~(control_flags f) noexcept
+constexpr control_flags operator~(control_flags f)
 {
     return static_cast<control_flags>(~static_cast<uint16_t>(f));
 }
 
-constexpr control_flags& operator|=(control_flags& f1, control_flags f2) noexcept
+constexpr control_flags& operator|=(control_flags& f1, control_flags f2)
 {
     f1 = f1 | f2;
     return f1;
 }
 
-constexpr control_flags& operator&=(control_flags& f1, control_flags f2) noexcept
+constexpr control_flags& operator&=(control_flags& f1, control_flags f2)
 {
     f1 = f1 & f2;
     return f1;
 }
 
-constexpr control_flags& operator^=(control_flags& f1, control_flags f2) noexcept
+constexpr control_flags& operator^=(control_flags& f1, control_flags f2)
 {
     f1 = f1 ^ f2;
     return f1;
 }
 
-constexpr bool has_any_flag(control_flags flag_to_test, control_flags flags) noexcept
+constexpr bool has_any_flag(control_flags flag_to_test, control_flags flags)
 {
     return (flag_to_test & flags) != control_flags::none;
 }
 
-constexpr bool has_all_flags(control_flags flag_to_test, control_flags flags) noexcept
+constexpr bool has_all_flags(control_flags flag_to_test, control_flags flags)
 {
     return (flag_to_test & flags) == flags;
 }
