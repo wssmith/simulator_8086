@@ -23,6 +23,29 @@ namespace
         { control_flags::direction, 'D' },
         { control_flags::overflow, 'O' },
     };
+
+    control_flags compute_flags(int32_t value)
+    {
+        control_flags new_flags = control_flags::none;
+
+        int ones_count = 0;
+        for (size_t i = 0; i < 8; ++i)
+            ones_count += (value & (1 << i)) != 0;
+
+        if ((ones_count & 1) == 0)
+            new_flags |= control_flags::parity;
+
+        if (value == 0)
+            new_flags |= control_flags::zero;
+
+        if ((value & 0x8000) != 0)
+            new_flags |= control_flags::sign;
+
+        if (value > 0x8000 || value < -0x8000)
+            new_flags |= control_flags::overflow;
+
+        return new_flags;
+    }
 }
 
 std::string get_flag_string(control_flags flags)
@@ -97,51 +120,31 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
             case operation_type::op_add:
             {
+                int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
-                {
-                    new_value = old_value + (op_value << 8);
-                }
+                    result = static_cast<int16_t>(old_value) + (static_cast<int16_t>(op_value) << 8);
                 else
-                {
-                    new_value = old_value + op_value;
-                }
+                    result = static_cast<int16_t>(old_value) + static_cast<int16_t>(op_value);
+
+                new_flags = compute_flags(result);
+
+                new_value = static_cast<uint16_t>(result);
                 break;
             }
 
             case operation_type::op_sub:
             case operation_type::op_cmp:
             {
-                uint16_t result = 0;
+                int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
-                {
-                    result = old_value - (op_value << 8);
-                }
+                    result = static_cast<int16_t>(old_value) - (static_cast<int16_t>(op_value) << 8);
                 else
-                {
-                    result = old_value - op_value;
-                }
+                    result = static_cast<int16_t>(old_value) - static_cast<int16_t>(op_value);
 
-                if (result == 0)
-                    new_flags |= control_flags::zero;
-                else
-                    new_flags &= ~control_flags::zero;
-
-                if ((result & 0x8000) != 0)
-                    new_flags |= control_flags::sign;
-                else
-                    new_flags &= ~control_flags::sign;
-
-                int ones_count = 0;
-                for (size_t i = 0; i < 8; ++i)
-                    ones_count += (result & (1 << i)) != 0;
-
-                if ((ones_count & 1) == 0)
-                    new_flags |= control_flags::parity;
-                else
-                    new_flags &= ~control_flags::parity;
+                new_flags = compute_flags(result);
 
                 if (inst.op == operation_type::op_sub)
-                    new_value = result;
+                    new_value = static_cast<uint16_t>(result);
 
                 break;
             }
