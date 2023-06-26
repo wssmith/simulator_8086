@@ -131,6 +131,15 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 else
                     new_flags &= ~control_flags::sign;
 
+                int ones_count = 0;
+                for (size_t i = 0; i < 8; ++i)
+                    ones_count += (result & (1 << i)) != 0;
+
+                if ((ones_count & 1) == 0)
+                    new_flags |= control_flags::parity;
+                else
+                    new_flags &= ~control_flags::parity;
+
                 if (inst.op == operation_type::op_sub)
                     new_value = result;
 
@@ -141,15 +150,11 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         // write to registers
         registers[destination->index] = new_value;
 
+        // reset instruction pointer if the code segment changed, otherwise increment it
         if (destination->index == code_segment_index && new_value != old_value)
-        {
-            // reset instruction pointer if the code segment changed
             registers[instruction_pointer_index] = 0;
-        }
         else
-        {
             ++registers[instruction_pointer_index];
-        }
 
         // update flags
         registers[flags_register_index] = static_cast<uint16_t>(new_flags);
