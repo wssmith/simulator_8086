@@ -104,8 +104,10 @@ namespace
         if (step.new_value != step.old_value)
         {
             const char* destination_register = get_register_name(step.destination);
-            builder << destination_register << ":" << "0x" << std::hex << step.old_value << "->" << "0x" << step.new_value << std::dec << " ";
+            builder << destination_register << ":0x" << std::hex << step.old_value << "->0x" << step.new_value << std::dec << " ";
         }
+
+        builder << "ip:0x" << std::hex << step.old_ip << "->0x" << step.new_ip << std::dec << " ";
 
         if (step.new_flags != step.old_flags)
         {

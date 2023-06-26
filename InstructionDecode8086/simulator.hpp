@@ -18,6 +18,8 @@ struct simulation_step
     uint16_t new_value{};
     control_flags old_flags{};
     control_flags new_flags{};
+    uint16_t old_ip{};
+    uint16_t new_ip{};
 };
 
 inline constexpr int code_segment_index = 8;

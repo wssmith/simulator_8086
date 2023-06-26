@@ -69,6 +69,11 @@ std::string get_flag_string(control_flags flags)
 
 simulation_step simulate_instruction(const instruction& inst, std::array<uint16_t, register_count>& registers)
 {
+    // update instruction pointer
+    const uint16_t old_ip = registers[instruction_pointer_index];
+    const uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
+    registers[instruction_pointer_index] = new_ip;
+
     auto matcher = overloaded
     {
         [](const effective_address_expression&) -> uint16_t { return 0; },
@@ -166,11 +171,11 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             .old_value = old_value,
             .new_value = new_value,
             .old_flags = old_flags,
-            .new_flags = new_flags
+            .new_flags = new_flags,
+            .old_ip = old_ip,
+            .new_ip = new_ip
         };
     }
-
-    registers[instruction_pointer_index] += inst.size;
 
     return step;
 }
