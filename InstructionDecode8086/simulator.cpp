@@ -111,7 +111,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 if (destination->count == 1)
                 {
                     if (destination->offset == 0)
-                        new_value = (old_value & 0x00FF) + (op_value << 8);
+                        new_value = (old_value & 0xFF) + (op_value << 8);
                     else
                         new_value = (old_value & 0xFF00) + op_value;
                 }
