@@ -56,6 +56,16 @@ enum class instruction_flags : uint16_t
     rep_ne = 1 << 5,
 };
 
+constexpr instruction_flags operator|(instruction_flags f1, instruction_flags f2)
+{
+    return static_cast<instruction_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
+}
+
+constexpr instruction_flags operator&(instruction_flags f1, instruction_flags f2)
+{
+    return static_cast<instruction_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
+}
+
 struct direct_address
 {
     uint32_t address;
@@ -86,7 +96,7 @@ struct effective_address_expression
     std::optional<effective_address_term> term2{};
     uint32_t explicit_segment{};
     int32_t displacement{};
-    uint32_t flags{};
+    effective_address_flags flags{};
 };
 
 enum class immediate_flags : uint16_t
@@ -98,7 +108,7 @@ enum class immediate_flags : uint16_t
 struct immediate
 {
     int32_t value{};
-    uint32_t flags{};
+    immediate_flags flags{};
 };
 
 using instruction_operand = std::variant<std::monostate, effective_address_expression, direct_address, register_access, immediate>;
@@ -109,7 +119,7 @@ struct instruction
     uint32_t size{};
 
     operation_type op{};
-    uint32_t flags{};
+    instruction_flags flags{};
 
     std::array<instruction_operand, 2> operands{ std::monostate{}, std::monostate{} };
 
@@ -119,8 +129,7 @@ struct instruction
 using data_iterator = std::vector<uint8_t>::const_iterator;
 
 std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end);
-std::optional<instruction> decode_instruction(const instruction_fields& fields);
-std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end);
+std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address);
 
 char const* get_register_name(const register_access& reg_access);
 char const* get_mneumonic(operation_type type);

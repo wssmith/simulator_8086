@@ -8,6 +8,7 @@
 #include <variant>
 
 #include "control_flags.hpp"
+#include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
 

@@ -55,14 +55,4 @@ constexpr control_flags& operator^=(control_flags& f1, control_flags f2)
     return f1;
 }
 
-constexpr bool has_any_flag(control_flags flag_to_test, control_flags flags)
-{
-    return (flag_to_test & flags) != control_flags::none;
-}
-
-constexpr bool has_all_flags(control_flags flag_to_test, control_flags flags)
-{
-    return (flag_to_test & flags) == flags;
-}
-
 #endif

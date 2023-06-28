@@ -131,6 +131,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="decoder.cpp" />
+    <ClCompile Include="flag_utils.hpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="simulator.cpp" />
   </ItemGroup>

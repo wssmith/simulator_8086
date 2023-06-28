@@ -198,15 +198,15 @@ namespace
     {
         switch (mod)
         {
-        case 0b00: // memory mode, no displacement unless direct address
-            return (rm == 0b110) * 2;
-        case 0b01: // memory mode, 8-bit displacement
-            return 1;
-        case 0b10: // memory mode, 16-bit displacement
-            return 2;
-        case 0b11: // register mode, no displacement
-        default:
-            return 0;
+            case 0b00: // memory mode, no displacement unless direct address
+                return (rm == 0b110) * 2;
+            case 0b01: // memory mode, 8-bit displacement
+                return 1;
+            case 0b10: // memory mode, 16-bit displacement
+                return 2;
+            case 0b11: // register mode, no displacement
+            default:
+                return 0;
         }
     }
 
@@ -273,13 +273,13 @@ namespace
     {
         switch (bytes)
         {
-        case 0:
-        default:
-            return 0;
-        case 1:
-            return static_cast<int8_t>(fields.disp_lo);
-        case 2:
-            return static_cast<int16_t>((fields.disp_hi << 8) + fields.disp_lo);
+            case 0:
+            default:
+                return 0;
+            case 1:
+                return static_cast<int8_t>(fields.disp_lo);
+            case 2:
+                return static_cast<int16_t>((fields.disp_hi << 8) + fields.disp_lo);
         }
     }
 
@@ -287,13 +287,13 @@ namespace
     {
         switch (bytes)
         {
-        case 0:
-        default:
-            return 0;
-        case 1:
-            return static_cast<uint8_t>(fields.disp_lo);
-        case 2:
-            return static_cast<uint16_t>((fields.disp_hi << 8) + fields.disp_lo);
+            case 0:
+            default:
+                return 0;
+            case 1:
+                return static_cast<uint8_t>(fields.disp_lo);
+            case 2:
+                return static_cast<uint16_t>((fields.disp_hi << 8) + fields.disp_lo);
         }
     }
 
@@ -303,18 +303,18 @@ namespace
         bool directAddress = false;
         switch (fields.mod)
         {
-        case 0b00: // direct address, 16-bit displacement
-            displacement_bytes = 2;
-            directAddress = (fields.rm == 0b110);
-            break;
+            case 0b00: // direct address, 16-bit displacement
+                displacement_bytes = 2;
+                directAddress = (fields.rm == 0b110);
+                break;
 
-        case 0b01: // memory mode, 8-bit displacement
-            displacement_bytes = 1;
-            break;
+            case 0b01: // memory mode, 8-bit displacement
+                displacement_bytes = 1;
+                break;
 
-        case 0b10: // memory mode, 16-bit displacement
-            displacement_bytes = 2;
-            break;
+            case 0b10: // memory mode, 16-bit displacement
+                displacement_bytes = 2;
+                break;
         }
         
         if (directAddress)
@@ -385,136 +385,136 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
 
     switch (fields.opcode)
     {
-    case opcode::mov_normal:
-    case opcode::add_normal:
-    case opcode::sub_normal:
-    case opcode::cmp_normal:
-    {
-        fields.w = b & 1;
-        b >>= 1;
-        fields.d = b & 1;
-
-        if (!read_and_advance(data_iter, data_end, b))
-            return {};
-
-        fields.rm = b & 0b111;
-        b >>= 3;
-        fields.reg = b & 0b111;
-        b >>= 3;
-        fields.mod = b;
-
-        if (!read_displacement(data_iter, data_end, fields))
-            return {};
-
-        break;
-    }
-
-    case opcode::arithmetic_immediate:
-        fields.s = (b >> 1) & 1;
-        [[fallthrough]];
-
-    case opcode::mov_immediate_to_register_or_memory:
-    {
-        fields.w = b & 1;
-
-        if (!read_and_advance(data_iter, data_end, b))
-            return {};
-
-        fields.rm = b & 0b111;
-        b >>= 3;
-        uint8_t op = b & 0b111;
-        b >>= 3;
-        fields.mod = b;
-
-        if (fields.opcode == opcode::arithmetic_immediate)
+        case opcode::mov_normal:
+        case opcode::add_normal:
+        case opcode::sub_normal:
+        case opcode::cmp_normal:
         {
-            fields.opcode = [&op]
-            {
-                switch (op)
-                {
-                    case 0b000: return opcode::add_immediate_to_register_or_memory;
-                    case 0b101: return opcode::sub_immediate_from_register_or_memory;
-                    case 0b111: return opcode::cmp_immediate_with_register_or_memory;
-                    default:    return opcode::none;
-                }
-            }();
+            fields.w = b & 1;
+            b >>= 1;
+            fields.d = b & 1;
+
+            if (!read_and_advance(data_iter, data_end, b))
+                return {};
+
+            fields.rm = b & 0b111;
+            b >>= 3;
+            fields.reg = b & 0b111;
+            b >>= 3;
+            fields.mod = b;
+
+            if (!read_displacement(data_iter, data_end, fields))
+                return {};
+
+            break;
         }
 
-        if (!read_displacement(data_iter, data_end, fields))
+        case opcode::arithmetic_immediate:
+            fields.s = (b >> 1) & 1;
+            [[fallthrough]];
+
+        case opcode::mov_immediate_to_register_or_memory:
+        {
+            fields.w = b & 1;
+
+            if (!read_and_advance(data_iter, data_end, b))
+                return {};
+
+            fields.rm = b & 0b111;
+            b >>= 3;
+            uint8_t op = b & 0b111;
+            b >>= 3;
+            fields.mod = b;
+
+            if (fields.opcode == opcode::arithmetic_immediate)
+            {
+                fields.opcode = [&op]
+                {
+                    switch (op)
+                    {
+                        case 0b000: return opcode::add_immediate_to_register_or_memory;
+                        case 0b101: return opcode::sub_immediate_from_register_or_memory;
+                        case 0b111: return opcode::cmp_immediate_with_register_or_memory;
+                        default:    return opcode::none;
+                    }
+                }();
+            }
+
+            if (!read_displacement(data_iter, data_end, fields))
+                return {};
+            if (!read_data(data_iter, data_end, fields))
+                return {};
+
+            break;
+        }
+
+        case opcode::mov_immediate_to_register:
+            fields.reg = b & 0b111;
+            b >>= 3;
+            [[fallthrough]];
+
+        case opcode::add_immediate_to_accumulator:
+        case opcode::sub_immediate_from_accumulator:
+        case opcode::cmp_immediate_with_accumulator:
+        case opcode::mov_memory_to_accumulator:
+        case opcode::mov_accumulator_to_memory:
+        {
+            fields.w = b & 1;
+
+            if (!read_data(data_iter, data_end, fields))
+                return {};
+
+            break;
+        }
+
+        case opcode::mov_to_segment_register:
+        case opcode::mov_from_segment_register:
+        {
+            if (!read_and_advance(data_iter, data_end, b))
+                return {};
+
+            fields.rm = b & 0b111;
+            b >>= 3;
+            fields.sr = b & 0b11;
+            b >>= 3;
+            fields.mod = b;
+
+            if (!read_displacement(data_iter, data_end, fields))
+                return {};
+
+            break;
+        }
+
+        case opcode::je:
+        case opcode::jl:
+        case opcode::jle:
+        case opcode::jb:
+        case opcode::jbe:
+        case opcode::jp:
+        case opcode::jo:
+        case opcode::js:
+        case opcode::jne:
+        case opcode::jnl:
+        case opcode::jg:
+        case opcode::jnb:
+        case opcode::ja:
+        case opcode::jnp:
+        case opcode::jno:
+        case opcode::jns:
+        case opcode::loop:
+        case opcode::loopz:
+        case opcode::loopnz:
+        case opcode::jcxz:
+        {
+            if (!read_and_advance(data_iter, data_end, fields.data_lo))
+                return {};
+
+            break;
+        }
+
+        default:
+        case opcode::none:
             return {};
-        if (!read_data(data_iter, data_end, fields))
-            return {};
-
-        break;
-    }
-
-    case opcode::mov_immediate_to_register:
-        fields.reg = b & 0b111;
-        b >>= 3;
-        [[fallthrough]];
-
-    case opcode::add_immediate_to_accumulator:
-    case opcode::sub_immediate_from_accumulator:
-    case opcode::cmp_immediate_with_accumulator:
-    case opcode::mov_memory_to_accumulator:
-    case opcode::mov_accumulator_to_memory:
-    {
-        fields.w = b & 1;
-
-        if (!read_data(data_iter, data_end, fields))
-            return {};
-
-        break;
-    }
-
-    case opcode::mov_to_segment_register:
-    case opcode::mov_from_segment_register:
-    {
-        if (!read_and_advance(data_iter, data_end, b))
-            return {};
-
-        fields.rm = b & 0b111;
-        b >>= 3;
-        fields.sr = b & 0b11;
-        b >>= 3;
-        fields.mod = b;
-
-        if (!read_displacement(data_iter, data_end, fields))
-            return {};
-
-        break;
-    }
-
-    case opcode::je:
-    case opcode::jl:
-    case opcode::jle:
-    case opcode::jb:
-    case opcode::jbe:
-    case opcode::jp:
-    case opcode::jo:
-    case opcode::js:
-    case opcode::jne:
-    case opcode::jnl:
-    case opcode::jg:
-    case opcode::jnb:
-    case opcode::ja:
-    case opcode::jnp:
-    case opcode::jno:
-    case opcode::jns:
-    case opcode::loop:
-    case opcode::loopz:
-    case opcode::loopnz:
-    case opcode::jcxz:
-    {
-        if (!read_and_advance(data_iter, data_end, fields.data_lo))
-            return {};
-
-        break;
-    }
-
-    default:
-    case opcode::none:
-        return {};
     }
 
     const data_iterator final_position = data_iter;
@@ -524,159 +524,162 @@ std::optional<instruction_fields> read_fields(data_iterator& data_iter, const da
     return fields;
 }
 
-std::optional<instruction> decode_instruction(const instruction_fields& fields)
+std::optional<instruction> decode_instruction(const instruction_fields& fields, uint32_t address)
 {
-    instruction inst;
-    inst.op = opcode_translation[fields.opcode];
-    inst.size = fields.size;
-    inst.flags |= fields.w ? static_cast<uint8_t>(instruction_flags::wide) : 0U;
+    instruction inst
+    {
+        .address = address,
+        .size = fields.size,
+        .op = opcode_translation[fields.opcode],
+        .flags = fields.w ? instruction_flags::wide : instruction_flags::none
+    };
 
     switch (fields.opcode)
     {
-    case opcode::mov_normal:
-    case opcode::add_normal:
-    case opcode::sub_normal:
-    case opcode::cmp_normal:
-    {
-        if (fields.mod == 0b11) // register mode
+        case opcode::mov_normal:
+        case opcode::add_normal:
+        case opcode::sub_normal:
+        case opcode::cmp_normal:
         {
-            const size_t op1_index = fields.rm + 8 * fields.w;
-            inst.operands[fields.d] = get_register_from_index(op1_index);
+            if (fields.mod == 0b11) // register mode
+            {
+                const size_t op1_index = fields.rm + 8 * fields.w;
+                inst.operands[fields.d] = get_register_from_index(op1_index);
 
-            const size_t op2_index = fields.reg + 8 * fields.w;
-            inst.operands[!fields.d] = get_register_from_index(op2_index);
+                const size_t op2_index = fields.reg + 8 * fields.w;
+                inst.operands[!fields.d] = get_register_from_index(op2_index);
+            }
+            else // memory mode
+            {
+                const size_t op_index = fields.reg + 8 * fields.w;
+                inst.operands[fields.d] = get_address_operand(fields);
+                inst.operands[!fields.d] = get_register_from_index(op_index);
+            }
+            break;
         }
-        else // memory mode
+
+        case opcode::add_immediate_to_register_or_memory:
+        case opcode::sub_immediate_from_register_or_memory:
+        case opcode::cmp_immediate_with_register_or_memory:
+        case opcode::mov_immediate_to_register_or_memory:
+        {
+            if (fields.mod == 0b11) // register mode
+            {
+                const size_t op_index = fields.rm + 8 * fields.w;
+                inst.operands[0] = get_register_from_index(op_index);
+            }
+            else // memory mode
+            {
+                inst.operands[0] = get_address_operand(fields);
+            }
+
+            inst.operands[1] = immediate
+            {
+                .value = get_instruction_data(fields)
+            };
+            break;
+        }
+
+        case opcode::mov_immediate_to_register:
+        case opcode::add_immediate_to_accumulator:
+        case opcode::sub_immediate_from_accumulator:
+        case opcode::cmp_immediate_with_accumulator:
         {
             const size_t op_index = fields.reg + 8 * fields.w;
-            inst.operands[fields.d] = get_address_operand(fields);
-            inst.operands[!fields.d] = get_register_from_index(op_index);
-        }
-        break;
-    }
-
-    case opcode::add_immediate_to_register_or_memory:
-    case opcode::sub_immediate_from_register_or_memory:
-    case opcode::cmp_immediate_with_register_or_memory:
-    case opcode::mov_immediate_to_register_or_memory:
-    {
-        if (fields.mod == 0b11) // register mode
-        {
-            const size_t op_index = fields.rm + 8 * fields.w;
             inst.operands[0] = get_register_from_index(op_index);
-        }
-        else // memory mode
-        {
-            inst.operands[0] = get_address_operand(fields);
-        }
-
-        inst.operands[1] = immediate
-        {
-            .value = get_instruction_data(fields)
-        };
-        break;
-    }
-
-    case opcode::mov_immediate_to_register:
-    case opcode::add_immediate_to_accumulator:
-    case opcode::sub_immediate_from_accumulator:
-    case opcode::cmp_immediate_with_accumulator:
-    {
-        const size_t op_index = fields.reg + 8 * fields.w;
-        inst.operands[0] = get_register_from_index(op_index);
-        inst.operands[1] = immediate
-        {
-            .value = get_instruction_data(fields)
-        };
-        break;
-    }
-
-    case opcode::mov_memory_to_accumulator:
-    case opcode::mov_accumulator_to_memory:
-    {
-        const bool to_memory = (fields.opcode == opcode::mov_accumulator_to_memory);
-
-        const size_t op_index = fields.w ? 8 : 0;
-        inst.operands[to_memory] = get_register_from_index(op_index);
-        inst.operands[!to_memory] = direct_address
-        {
-            .address = get_instruction_address(fields),
-        };
-        break;
-    }
-
-    case opcode::mov_to_segment_register:
-    case opcode::mov_from_segment_register:
-    {
-        const bool from_segment = (fields.opcode == opcode::mov_from_segment_register);
-
-        inst.operands[from_segment] = register_access
-        {
-            .index = segment_register_index_map[fields.sr],
-            .offset = 0,
-            .count = 2
-        };
-
-        if (fields.mod == 0b11) // register mode
-        {
-            const size_t non_segment_index = fields.rm + 8;
-            inst.operands[!from_segment] = register_access
+            inst.operands[1] = immediate
             {
-                .index = register_index_map[non_segment_index],
+                .value = get_instruction_data(fields)
+            };
+            break;
+        }
+
+        case opcode::mov_memory_to_accumulator:
+        case opcode::mov_accumulator_to_memory:
+        {
+            const bool to_memory = (fields.opcode == opcode::mov_accumulator_to_memory);
+
+            const size_t op_index = fields.w ? 8 : 0;
+            inst.operands[to_memory] = get_register_from_index(op_index);
+            inst.operands[!to_memory] = direct_address
+            {
+                .address = get_instruction_address(fields),
+            };
+            break;
+        }
+
+        case opcode::mov_to_segment_register:
+        case opcode::mov_from_segment_register:
+        {
+            const bool from_segment = (fields.opcode == opcode::mov_from_segment_register);
+
+            inst.operands[from_segment] = register_access
+            {
+                .index = segment_register_index_map[fields.sr],
                 .offset = 0,
                 .count = 2
             };
-        }
-        else // memory mode
-        {
-            inst.operands[!from_segment] = get_address_operand(fields);
-        }
-        break;
-    }
 
-    case opcode::je:
-    case opcode::jl:
-    case opcode::jle:
-    case opcode::jb:
-    case opcode::jbe:
-    case opcode::jp:
-    case opcode::jo:
-    case opcode::js:
-    case opcode::jne:
-    case opcode::jnl:
-    case opcode::jg:
-    case opcode::jnb:
-    case opcode::ja:
-    case opcode::jnp:
-    case opcode::jno:
-    case opcode::jns:
-    case opcode::loop:
-    case opcode::loopz:
-    case opcode::loopnz:
-    case opcode::jcxz:
-    {
-        inst.operands[0] = immediate
-        {
-            .value = get_instruction_data(fields),
-            .flags = static_cast<uint8_t>(immediate_flags::relative_jump_displacement)
-        };
-        break;
-    }
+            if (fields.mod == 0b11) // register mode
+            {
+                const size_t non_segment_index = fields.rm + 8;
+                inst.operands[!from_segment] = register_access
+                {
+                    .index = register_index_map[non_segment_index],
+                    .offset = 0,
+                    .count = 2
+                };
+            }
+            else // memory mode
+            {
+                inst.operands[!from_segment] = get_address_operand(fields);
+            }
+            break;
+        }
 
-    default:
-    case opcode::none:
-        return {};
+        case opcode::je:
+        case opcode::jl:
+        case opcode::jle:
+        case opcode::jb:
+        case opcode::jbe:
+        case opcode::jp:
+        case opcode::jo:
+        case opcode::js:
+        case opcode::jne:
+        case opcode::jnl:
+        case opcode::jg:
+        case opcode::jnb:
+        case opcode::ja:
+        case opcode::jnp:
+        case opcode::jno:
+        case opcode::jns:
+        case opcode::loop:
+        case opcode::loopz:
+        case opcode::loopnz:
+        case opcode::jcxz:
+        {
+            inst.operands[0] = immediate
+            {
+                .value = get_instruction_data(fields),
+                .flags = immediate_flags::relative_jump_displacement
+            };
+            break;
+        }
+
+        default:
+        case opcode::none:
+            return {};
     }
 
     return inst;
 }
 
-std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end)
+std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address)
 {
     const std::optional<instruction_fields> fields_result = read_fields(data_iter, data_end);
     if (fields_result.has_value())
     {
-        const std::optional<instruction> inst = decode_instruction(fields_result.value());
+        const std::optional<instruction> inst = decode_instruction(fields_result.value(), address);
         return inst;
     }
     return {};

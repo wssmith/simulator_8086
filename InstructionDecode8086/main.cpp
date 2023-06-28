@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "control_flags.hpp"
+#include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
 #include "simulator.hpp"
@@ -39,21 +40,23 @@ namespace
         return data;
     }
 
+    std::string print_width(const instruction& inst)
+    {
+        return has_any_flag(inst.flags, instruction_flags::wide) ? "word" : "byte";
+    }
+
     std::string print_instruction(const instruction& inst)
     {
         const char* mnemonic = get_mneumonic(inst.op);
 
-        auto match_operand = overloaded
+        auto matcher = overloaded
         {
             [&inst](const effective_address_expression& address_op)
             {
                 std::string address_text;
 
                 if (std::holds_alternative<immediate>(inst.operands[1]))
-                {
-                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flags::wide)) != 0;
-                    address_text += (is_word ? "word " : "byte ");
-                }
+                    address_text += print_width(inst) + " ";
 
                 address_text += "[" + std::string(get_register_name(address_op.term1.reg));
 
@@ -73,10 +76,7 @@ namespace
                 std::string direct_address_text;
 
                 if (std::holds_alternative<immediate>(inst.operands[1]))
-                {
-                    const bool is_word = (inst.flags & static_cast<uint8_t>(instruction_flags::wide)) != 0;
-                    direct_address_text += (is_word ? "word " : "byte ");
-                }
+                    direct_address_text += print_width(inst) + " ";
 
                 direct_address_text += "[" + std::to_string(direct_address_op.address) + "]";
 
@@ -87,8 +87,8 @@ namespace
             [](std::monostate) { return std::string(); }
         };
 
-        const std::string first_operand = std::visit(match_operand, inst.operands[0]);
-        const std::string second_operand = std::visit(match_operand, inst.operands[1]);
+        const std::string first_operand = std::visit(matcher, inst.operands[0]);
+        const std::string second_operand = std::visit(matcher, inst.operands[1]);
 
         std::string asm_line = std::string(mnemonic) + " " + first_operand;
         if (second_operand.length() != 0)
@@ -104,14 +104,24 @@ namespace
         if (step.new_value != step.old_value)
         {
             const char* destination_register = get_register_name(step.destination);
-            builder << destination_register << ":0x" << std::hex << step.old_value << "->0x" << step.new_value << std::dec << " ";
+
+            std::ostringstream register_builder;
+            register_builder << destination_register << ":0x" << std::hex << step.old_value << "->0x" << step.new_value << std::dec;
+
+            builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
+            builder << register_builder.str();
         }
 
-        builder << "ip:0x" << std::hex << step.old_ip << "->0x" << step.new_ip << std::dec << " ";
+        std::ostringstream ip_builder;
+        ip_builder << "ip:0x" << std::hex << step.old_ip << "->0x" << step.new_ip << std::dec;
+
+        builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
+        builder << ip_builder.str();
 
         if (step.new_flags != step.old_flags)
         {
-            builder << "flags:" << get_flag_string(step.old_flags) << "->" << get_flag_string(step.new_flags);
+            builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
+            builder << "flags:" + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
         }
 
         return builder.str();
@@ -133,11 +143,13 @@ namespace
             {
                 const auto flags = static_cast<control_flags>(registers[flags_register_index]);
 
-                builder << "   " << register_name << ": " << get_flag_string(flags) << '\n';
+                builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
+                builder << register_name << ": " << get_flag_string(flags) << '\n';
             }
             else
             {
-                builder << "      " << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
+                builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
+                builder << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
             }
         }
 
@@ -193,18 +205,18 @@ int main(int argc, char* argv[])
         // decode instruction
         while (data_iter != data_end)
         {
-            std::optional<instruction> inst_result = decode_instruction(data_iter, data_end);
+            std::optional<instruction> inst_result = decode_instruction(data_iter, data_end, current_address);
             if (!inst_result.has_value())
                 continue;
 
             instruction_list.push_back(inst_result.value());
 
-            instruction& inst = instruction_list.back();
-            inst.address = current_address;
+            const instruction& inst = instruction_list.back();
             current_address += inst.size;
 
             // print instruction
             std::string asm_line = print_instruction(inst);
+            std::cout << std::left << std::setw(20) << std::fixed << std::setfill(' ');
             std::cout << asm_line;
 
             // execute instruction?
