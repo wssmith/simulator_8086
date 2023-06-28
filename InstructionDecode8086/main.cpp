@@ -58,10 +58,10 @@ namespace
                 if (std::holds_alternative<immediate>(inst.operands[1]))
                     address_text += print_width(inst) + " ";
 
-                address_text += "[" + std::string(get_register_name(address_op.term1.reg));
+                address_text += "[" + std::string{ get_register_name(address_op.term1.reg) };
 
                 if (address_op.term2.has_value())
-                    address_text += " + " + std::string(get_register_name(address_op.term2.value().reg));
+                    address_text += " + " + std::string{ get_register_name(address_op.term2.value().reg) };
 
                 if (address_op.displacement > 0)
                     address_text += " + " + std::to_string(address_op.displacement);
@@ -82,15 +82,15 @@ namespace
 
                 return direct_address_text;
             },
-            [](const register_access& register_op) { return std::string(get_register_name(register_op)); },
+            [](const register_access& register_op) { return std::string{ get_register_name(register_op) }; },
             [](immediate immediate_op) { return std::to_string(immediate_op.value); },
-            [](std::monostate) { return std::string(); }
+            [](std::monostate) { return std::string{}; }
         };
 
         const std::string first_operand = std::visit(matcher, inst.operands[0]);
         const std::string second_operand = std::visit(matcher, inst.operands[1]);
 
-        std::string asm_line = std::string(mnemonic) + " " + first_operand;
+        std::string asm_line = std::string{ mnemonic } + " " + first_operand;
         if (second_operand.length() != 0)
             asm_line += ", " + second_operand;
 
@@ -200,7 +200,7 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
-        std::array<uint16_t, register_count> registers{ };
+        std::array<uint16_t, register_count> registers{};
 
         // decode instruction
         while (data_iter != data_end)
