@@ -112,7 +112,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
         switch (inst.op)
         {
-            case operation_type::op_mov:
+            case operation_type::mov:
             {
                 if (destination->count == 1)
                 {
@@ -128,7 +128,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 break;
             }
 
-            case operation_type::op_add:
+            case operation_type::add:
             {
                 int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
@@ -142,8 +142,8 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
                 break;
             }
 
-            case operation_type::op_sub:
-            case operation_type::op_cmp:
+            case operation_type::sub:
+            case operation_type::cmp:
             {
                 int32_t result = 0;
                 if (destination->count == 1 && destination->offset == 0)
@@ -153,9 +153,34 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
                 new_flags = compute_flags(result, wide_value);
 
-                if (inst.op == operation_type::op_sub)
+                if (inst.op == operation_type::sub)
                     new_value = static_cast<uint16_t>(result);
 
+                break;
+            }
+
+            case operation_type::je:
+            case operation_type::jl:
+            case operation_type::jle:
+            case operation_type::jb:
+            case operation_type::jbe:
+            case operation_type::jp:
+            case operation_type::jo:
+            case operation_type::js:
+            case operation_type::jne:
+            case operation_type::jnl:
+            case operation_type::jg:
+            case operation_type::jnb:
+            case operation_type::ja:
+            case operation_type::jnp:
+            case operation_type::jno:
+            case operation_type::jns:
+            case operation_type::loop:
+            case operation_type::loopz:
+            case operation_type::loopnz:
+            case operation_type::jcxz:
+            {
+                // todo
                 break;
             }
         }
