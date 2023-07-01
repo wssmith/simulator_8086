@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <ios>
 #include <iomanip>
@@ -97,32 +98,50 @@ namespace
         return asm_line;
     }
 
+    void print_state_transition(std::ostringstream& stream, const char* destination_register, int width, uint16_t old_value, uint16_t new_value)
+    {
+        std::ostringstream register_builder;
+        register_builder << destination_register << ":0x" << std::hex << old_value << "->0x" << new_value << std::dec;
+
+        stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
+        stream << register_builder.str();
+    }
+
+    void print_flags_transition(std::ostringstream& stream, const char* flag_register, int width, const simulation_step& step)
+    {
+        stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
+        stream << std::string{ flag_register } + ":" + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
+    }
+
+    void print_literal(std::ostringstream& stream, const char* literal, int width)
+    {
+        stream << std::left << std::setw(width) << std::fixed << std::setfill(' ') << literal;
+    }
+
+    void print_empty_column(std::ostringstream& stream, int width)
+    {
+        print_literal(stream, "", width);
+    }
+    
     std::string print_simulation_step(const simulation_step& step)
     {
+        constexpr int column_width = 20;
         std::ostringstream builder;
 
         if (step.new_value != step.old_value)
         {
             const char* destination_register = get_register_name(step.destination);
-
-            std::ostringstream register_builder;
-            register_builder << destination_register << ":0x" << std::hex << step.old_value << "->0x" << step.new_value << std::dec;
-
-            builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
-            builder << register_builder.str();
+            print_state_transition(builder, destination_register, column_width, step.old_value, step.new_value);
+        }
+        else
+        {
+            print_empty_column(builder, column_width);
         }
 
-        std::ostringstream ip_builder;
-        ip_builder << "ip:0x" << std::hex << step.old_ip << "->0x" << step.new_ip << std::dec;
-
-        builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
-        builder << ip_builder.str();
+        print_state_transition(builder, "ip", column_width, step.old_ip, step.new_ip);
 
         if (step.new_flags != step.old_flags)
-        {
-            builder << std::left << std::setw(20) << std::fixed << std::setfill(' ');
-            builder << "flags:" + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
-        }
+            print_flags_transition(builder, "flags", 10, step);
 
         return builder.str();
     }
@@ -188,6 +207,10 @@ int main(int argc, char* argv[])
         }
     }
 
+    std::string input_filename = std::filesystem::path(app_args.input_path).filename().string();
+    const char* action = app_args.execute_mode ? "execution" : "decoding";
+    std::cout << "--- " << input_filename << " " << action << " --- \n\n";
+
     try
     {
         // read binary file
@@ -215,8 +238,9 @@ int main(int argc, char* argv[])
             current_address += inst.size;
 
             // print instruction
+            constexpr int column_width = 20;
             std::string asm_line = print_instruction(inst);
-            std::cout << std::left << std::setw(20) << std::fixed << std::setfill(' ');
+            std::cout << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
             std::cout << asm_line;
 
             // execute instruction?
