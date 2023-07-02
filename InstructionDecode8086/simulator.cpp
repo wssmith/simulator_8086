@@ -72,8 +72,10 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 {
     // update instruction pointer
     const uint16_t old_ip = registers[instruction_pointer_index];
-    const uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
-    registers[instruction_pointer_index] = new_ip;
+    uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
+
+    const auto old_flags = static_cast<control_flags>(registers[flags_register_index]);
+    control_flags new_flags = old_flags;
 
     auto matcher = overloaded
     {
@@ -105,10 +107,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         const auto signed_op_value = static_cast<int16_t>(op_value);
         const bool wide_value = (destination->count == 2);
 
-        const auto old_flags = static_cast<control_flags>(registers[flags_register_index]);
-
         uint16_t new_value = old_value;
-        control_flags new_flags = old_flags;
 
         switch (inst.op)
         {
@@ -158,31 +157,6 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
                 break;
             }
-
-            case operation_type::je:
-            case operation_type::jl:
-            case operation_type::jle:
-            case operation_type::jb:
-            case operation_type::jbe:
-            case operation_type::jp:
-            case operation_type::jo:
-            case operation_type::js:
-            case operation_type::jne:
-            case operation_type::jnl:
-            case operation_type::jg:
-            case operation_type::jnb:
-            case operation_type::ja:
-            case operation_type::jnp:
-            case operation_type::jno:
-            case operation_type::jns:
-            case operation_type::loop:
-            case operation_type::loopz:
-            case operation_type::loopnz:
-            case operation_type::jcxz:
-            {
-                // todo
-                break;
-            }
         }
 
         // write to registers
@@ -202,6 +176,91 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             .new_ip = new_ip
         };
     }
+    else if (const immediate* displacement = std::get_if<immediate>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+    {
+        const bool do_jump = [&inst, &old_flags]
+        {
+            switch (inst.op)
+            {
+                case operation_type::je:
+                    return has_any_flag(old_flags, control_flags::zero);
+                case operation_type::jne:
+                    return !has_any_flag(old_flags, control_flags::zero);
+
+                case operation_type::jl:
+                    return has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
+                        || !has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow);
+                case operation_type::jnl:
+                    return has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
+                        || !has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow);
+
+                case operation_type::jle:
+                    return has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
+                        || !has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
+                        || has_any_flag(old_flags, control_flags::zero);
+                case operation_type::jg:
+                    return has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
+                        || !has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
+                        || !has_any_flag(old_flags, control_flags::zero);
+
+                case operation_type::jb:
+                    return has_any_flag(old_flags, control_flags::carry);
+                case operation_type::jnb:
+                    return !has_any_flag(old_flags, control_flags::carry);
+
+                case operation_type::jbe:
+                    return has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+                case operation_type::ja:
+                    return !has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+
+                case operation_type::jp:
+                    return has_any_flag(old_flags, control_flags::parity);
+                case operation_type::jnp:
+                    return !has_any_flag(old_flags, control_flags::parity);
+
+                case operation_type::jo:
+                    return has_any_flag(old_flags, control_flags::overflow);
+                case operation_type::jno:
+                    return !has_any_flag(old_flags, control_flags::overflow);
+
+                case operation_type::js:
+                    return has_any_flag(old_flags, control_flags::sign);
+                case operation_type::jns:
+                    return !has_any_flag(old_flags, control_flags::sign);
+
+                default:
+                case operation_type::loop:
+                case operation_type::loopz:
+                case operation_type::loopnz:
+                case operation_type::jcxz:
+                {
+                    return true;
+                }
+            }
+        }();
+
+        if (do_jump)
+            new_ip += displacement->value;
+
+        step = simulation_step
+        {
+            .destination = register_access
+            {
+                .index = instruction_pointer_index,
+                .offset = 0,
+                .count = 2
+            },
+            .old_value = old_ip,
+            .new_value = new_ip,
+            .old_flags = old_flags,
+            .new_flags = new_flags,
+            .old_ip = old_ip,
+            .new_ip = new_ip
+        };
+    }
+
+    // update instruction pointer
+    registers[instruction_pointer_index] = new_ip;
 
     return step;
 }

@@ -226,7 +226,7 @@ int main(int argc, char* argv[])
         std::array<uint16_t, register_count> registers{};
 
         // decode instruction
-        while (data_iter != data_end)
+        while (data_iter <= data_end)
         {
             std::optional<instruction> inst_result = decode_instruction(data_iter, data_end, current_address);
             if (!inst_result.has_value())
@@ -247,6 +247,11 @@ int main(int argc, char* argv[])
             if (app_args.execute_mode)
             {
                 simulation_step step = simulate_instruction(inst, registers);
+
+                int32_t actual_ip_change = step.new_ip - step.old_ip;
+                if (int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size)); delta != 0)
+                    std::advance(data_iter, delta);
+
                 std::string sim_line = print_simulation_step(step);
 
                 std::cout << " ; " << sim_line;
