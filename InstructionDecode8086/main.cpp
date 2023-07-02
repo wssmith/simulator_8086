@@ -48,6 +48,8 @@ namespace
 
     std::string print_instruction(const instruction& inst)
     {
+        using std::string_literals::operator ""s;
+
         const char* mnemonic = get_mneumonic(inst.op);
 
         auto matcher = overloaded
@@ -59,10 +61,10 @@ namespace
                 if (std::holds_alternative<immediate>(inst.operands[1]))
                     address_text += print_width(inst) + " ";
 
-                address_text += "[" + std::string{ get_register_name(address_op.term1.reg) };
+                address_text += "["s + get_register_name(address_op.term1.reg);
 
                 if (address_op.term2.has_value())
-                    address_text += " + " + std::string{ get_register_name(address_op.term2.value().reg) };
+                    address_text += " + "s + get_register_name(address_op.term2.value().reg);
 
                 if (address_op.displacement > 0)
                     address_text += " + " + std::to_string(address_op.displacement);
@@ -83,21 +85,24 @@ namespace
 
                 return direct_address_text;
             },
-            [](const register_access& register_op) { return std::string{ get_register_name(register_op) }; },
+            [](const register_access& register_op) -> std::string { return get_register_name(register_op); },
             [&inst](immediate immediate_op)
             {
                 if (has_any_flag(immediate_op.flags, immediate_flags::relative_jump_displacement))
-                    return "$" + std::to_string(immediate_op.value + static_cast<int32_t>(inst.size));
+                {
+                    const int32_t value = immediate_op.value + static_cast<int32_t>(inst.size);
+                    return "$" + (value >= 0 ? "+" + std::to_string(value) : "-" + std::to_string(-value));
+                }
 
                 return std::to_string(immediate_op.value);
             },
-            [](std::monostate) { return std::string{}; }
+            [](std::monostate) { return ""s; }
         };
 
         const std::string first_operand = std::visit(matcher, inst.operands[0]);
         const std::string second_operand = std::visit(matcher, inst.operands[1]);
 
-        std::string asm_line = std::string{ mnemonic } + " " + first_operand;
+        std::string asm_line = mnemonic + " "s + first_operand;
         if (second_operand.length() != 0)
             asm_line += ", " + second_operand;
 
@@ -115,8 +120,10 @@ namespace
 
     void print_flags_transition(std::ostringstream& stream, const char* flag_register, int width, const simulation_step& step)
     {
+        using std::string_literals::operator ""s;
+
         stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
-        stream << std::string{ flag_register } + ":" + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
+        stream << flag_register + ":"s + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
     }
 
     void print_literal(std::ostringstream& stream, const char* literal, int width)
