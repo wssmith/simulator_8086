@@ -84,7 +84,13 @@ namespace
                 return direct_address_text;
             },
             [](const register_access& register_op) { return std::string{ get_register_name(register_op) }; },
-            [](immediate immediate_op) { return std::to_string(immediate_op.value); },
+            [&inst](immediate immediate_op)
+            {
+                if (has_any_flag(immediate_op.flags, immediate_flags::relative_jump_displacement))
+                    return "$" + std::to_string(immediate_op.value + static_cast<int32_t>(inst.size));
+
+                return std::to_string(immediate_op.value);
+            },
             [](std::monostate) { return std::string{}; }
         };
 
@@ -226,7 +232,7 @@ int main(int argc, char* argv[])
         std::array<uint16_t, register_count> registers{};
 
         // decode instruction
-        while (data_iter <= data_end)
+        while (data_iter < data_end)
         {
             std::optional<instruction> inst_result = decode_instruction(data_iter, data_end, current_address);
             if (!inst_result.has_value())
@@ -249,7 +255,8 @@ int main(int argc, char* argv[])
                 simulation_step step = simulate_instruction(inst, registers);
 
                 int32_t actual_ip_change = step.new_ip - step.old_ip;
-                if (int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size)); delta != 0)
+                int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size));
+                if (delta != 0)
                     std::advance(data_iter, delta);
 
                 std::string sim_line = print_simulation_step(step);

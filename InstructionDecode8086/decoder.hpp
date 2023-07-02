@@ -105,6 +105,16 @@ enum class immediate_flags : uint16_t
     relative_jump_displacement = 1 << 0,
 };
 
+constexpr immediate_flags operator|(immediate_flags f1, immediate_flags f2)
+{
+    return static_cast<immediate_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
+}
+
+constexpr immediate_flags operator&(immediate_flags f1, immediate_flags f2)
+{
+    return static_cast<immediate_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
+}
+
 struct immediate
 {
     int32_t value{};

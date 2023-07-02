@@ -102,12 +102,12 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     if (const register_access* destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
     {
         const uint16_t old_value = registers[destination->index];
+        uint16_t new_value = old_value;
+
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
         const auto signed_old_value = static_cast<int16_t>(old_value);
         const auto signed_op_value = static_cast<int16_t>(op_value);
         const bool wide_value = (destination->count == 2);
-
-        uint16_t new_value = old_value;
 
         switch (inst.op)
         {
@@ -178,80 +178,127 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     }
     else if (const immediate* displacement = std::get_if<immediate>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
     {
-        const bool do_jump = [&inst, &old_flags]
+        auto destination = register_access
         {
-            switch (inst.op)
+            .index = instruction_pointer_index,
+            .offset = 0,
+            .count = 2
+        };
+
+        uint16_t old_value = 0;
+        uint16_t new_value = 0;
+        bool do_jump = false;
+
+        switch (inst.op)
+        {
+            case operation_type::je:
+                do_jump = has_any_flag(old_flags, control_flags::zero);
+                break;
+            case operation_type::jne:
+                do_jump = !has_any_flag(old_flags, control_flags::zero);
+                break;
+
+            case operation_type::jl:
+                do_jump = has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow);
+                break;
+            case operation_type::jnl:
+                do_jump = !(has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow));
+                break;
+
+            case operation_type::jle:
+                do_jump = (has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow)) || has_any_flag(old_flags, control_flags::zero);
+                break;
+            case operation_type::jg:
+                do_jump = !(has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow)) || !has_any_flag(old_flags, control_flags::zero);
+                break;
+
+            case operation_type::jb:
+                do_jump = has_any_flag(old_flags, control_flags::carry);
+                break;
+            case operation_type::jnb:
+                do_jump = !has_any_flag(old_flags, control_flags::carry);
+                break;
+
+            case operation_type::jbe:
+                do_jump = has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+                break;
+            case operation_type::ja:
+                do_jump = !has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+                break;
+
+            case operation_type::jp:
+                do_jump = has_any_flag(old_flags, control_flags::parity);
+                break;
+            case operation_type::jnp:
+                do_jump = !has_any_flag(old_flags, control_flags::parity);
+                break;
+
+            case operation_type::jo:
+                do_jump = has_any_flag(old_flags, control_flags::overflow);
+                break;
+            case operation_type::jno:
+                do_jump = !has_any_flag(old_flags, control_flags::overflow);
+                break;
+
+            case operation_type::js:
+                do_jump = has_any_flag(old_flags, control_flags::sign);
+                break;
+            case operation_type::jns:
+                do_jump = !has_any_flag(old_flags, control_flags::sign);
+                break;
+
+            case operation_type::loopz:
+            case operation_type::loopnz:
+            case operation_type::loop:
+            case operation_type::jcxz:
             {
-                case operation_type::je:
-                    return has_any_flag(old_flags, control_flags::zero);
-                case operation_type::jne:
-                    return !has_any_flag(old_flags, control_flags::zero);
-
-                case operation_type::jl:
-                    return has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
-                        || !has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow);
-                case operation_type::jnl:
-                    return has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
-                        || !has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow);
-
-                case operation_type::jle:
-                    return has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
-                        || !has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
-                        || has_any_flag(old_flags, control_flags::zero);
-                case operation_type::jg:
-                    return has_any_flag(old_flags, control_flags::sign) && has_any_flag(old_flags, control_flags::overflow)
-                        || !has_any_flag(old_flags, control_flags::sign) && !has_any_flag(old_flags, control_flags::overflow)
-                        || !has_any_flag(old_flags, control_flags::zero);
-
-                case operation_type::jb:
-                    return has_any_flag(old_flags, control_flags::carry);
-                case operation_type::jnb:
-                    return !has_any_flag(old_flags, control_flags::carry);
-
-                case operation_type::jbe:
-                    return has_any_flag(old_flags, control_flags::zero | control_flags::carry);
-                case operation_type::ja:
-                    return !has_any_flag(old_flags, control_flags::zero | control_flags::carry);
-
-                case operation_type::jp:
-                    return has_any_flag(old_flags, control_flags::parity);
-                case operation_type::jnp:
-                    return !has_any_flag(old_flags, control_flags::parity);
-
-                case operation_type::jo:
-                    return has_any_flag(old_flags, control_flags::overflow);
-                case operation_type::jno:
-                    return !has_any_flag(old_flags, control_flags::overflow);
-
-                case operation_type::js:
-                    return has_any_flag(old_flags, control_flags::sign);
-                case operation_type::jns:
-                    return !has_any_flag(old_flags, control_flags::sign);
-
-                default:
-                case operation_type::loop:
-                case operation_type::loopz:
-                case operation_type::loopnz:
-                case operation_type::jcxz:
+                destination = register_access
                 {
-                    return true;
+                    .index = counter_register_index,
+                    .offset = 0,
+                    .count = 2
+                };
+
+                old_value = registers[counter_register_index];
+
+                if (inst.op == operation_type::jcxz)
+                {
+                    new_value = old_value;
                 }
+                else
+                {
+                    new_value = old_value - 1;
+                    registers[counter_register_index] = new_value;
+                }
+
+                do_jump = false;
+                switch (inst.op)
+                {
+                    case operation_type::loopz:
+                        do_jump = new_value == 0 && has_any_flag(old_flags, control_flags::zero);
+                        break;
+                    case operation_type::loopnz:
+                        do_jump = new_value != 0 && !has_any_flag(old_flags, control_flags::zero);
+                        break;
+                    case operation_type::loop:
+                        do_jump = new_value == 0;
+                        break;
+                    case operation_type::jcxz:
+                        do_jump = registers[counter_register_index] == 0;
+                        break;
+                }
+                break;
             }
-        }();
+        }
 
         if (do_jump)
             new_ip += displacement->value;
 
         step = simulation_step
         {
-            .destination = register_access
-            {
-                .index = instruction_pointer_index,
-                .offset = 0,
-                .count = 2
-            },
-            .old_value = old_ip,
-            .new_value = new_ip,
+            .destination = destination,
+            .old_value = old_value,
+            .new_value = new_value,
             .old_flags = old_flags,
             .new_flags = new_flags,
             .old_ip = old_ip,

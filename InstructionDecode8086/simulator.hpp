@@ -22,6 +22,7 @@ struct simulation_step
     uint16_t new_ip{};
 };
 
+inline constexpr int counter_register_index = 2;
 inline constexpr int code_segment_index = 8;
 inline constexpr int instruction_pointer_index = 12;
 inline constexpr int flags_register_index = 13;
