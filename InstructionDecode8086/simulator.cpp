@@ -72,7 +72,7 @@ namespace
         }
     }
 
-    control_flags compute_flags(int32_t result, bool wide_value)
+    control_flags compute_flags(int32_t existing, int32_t operand, int32_t result, bool wide_value)
     {
         control_flags new_flags = control_flags::none;
 
@@ -87,16 +87,22 @@ namespace
 
         const auto width = wide_value ? simulator_numeric_width::word : simulator_numeric_width::byte;
         const auto limits = get_numeric_limits(width);
-        const auto aux_limits = get_numeric_limits(simulator_numeric_width::nibble);
 
-        if (result > limits.max_signed || result < limits.min_signed)
+        const bool existing_in_signed_range = existing <= limits.max_signed && existing >= limits.min_signed;
+        if (existing_in_signed_range && ((operand > 0 && result > limits.max_signed) || (operand < 0 && result < limits.min_signed)))
             new_flags |= control_flags::overflow;
 
-        if (result > limits.max_unsigned || result < limits.min_unsigned)
+        const bool existing_in_unsigned_range = existing <= limits.max_unsigned && existing >= limits.min_unsigned;
+        if (existing_in_unsigned_range && ((operand > 0 && result > limits.max_unsigned) || (operand < 0 && result < limits.min_unsigned)))
             new_flags |= control_flags::carry;
 
-        if (result > aux_limits.max_unsigned || result < aux_limits.min_unsigned)
+        /*
+        const auto aux_width = wide_value ? simulator_numeric_width::byte : simulator_numeric_width::nibble;
+        const auto aux_limits = get_numeric_limits(aux_width);
+
+        if ((existing <= aux_limits.max_unsigned && existing >= aux_limits.min_unsigned) && ((operand > 0 && result > aux_limits.max_unsigned) || (operand < 0 && result < aux_limits.min_unsigned)))
             new_flags |= control_flags::aux_carry;
+        */
 
         return new_flags;
     }
@@ -180,26 +186,19 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             }
 
             case operation_type::add:
-            {
-                const int32_t operand = (destination->count == 1 && destination->offset == 0) ? signed_op_value << 8 : signed_op_value;
-                const int32_t result = signed_old_value + operand;
-
-                new_flags = compute_flags(result, wide_value);
-
-                new_value = static_cast<uint16_t>(result);
-                break;
-            }
-
             case operation_type::sub:
             case operation_type::cmp:
             {
-                const int32_t operand = (destination->count == 1 && destination->offset == 0) ? signed_op_value << 8 : signed_op_value;
-                const int32_t result = signed_old_value - operand;
+                int32_t operand = (destination->count == 1 && destination->offset == 0) ? signed_op_value << 8 : signed_op_value;
+                if (inst.op != operation_type::add)
+                    operand *= -1;
 
-                new_flags = compute_flags(result, wide_value);
+                const int32_t result = signed_old_value + operand;
+                new_flags = compute_flags(signed_old_value, operand, result, wide_value);
 
-                if (inst.op == operation_type::sub)
+                if (inst.op != operation_type::cmp)
                     new_value = static_cast<uint16_t>(result);
+
                 break;
             }
         }
