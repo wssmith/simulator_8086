@@ -7,6 +7,8 @@
 #include <variant>
 #include <vector>
 
+#include "flag_utils.hpp"
+
 struct instruction_fields;
 
 using register_index = uint32_t;
@@ -56,15 +58,7 @@ enum class instruction_flags : uint16_t
     rep_ne = 1 << 5,
 };
 
-constexpr instruction_flags operator|(instruction_flags f1, instruction_flags f2)
-{
-    return static_cast<instruction_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
-}
-
-constexpr instruction_flags operator&(instruction_flags f1, instruction_flags f2)
-{
-    return static_cast<instruction_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
-}
+FLAG_OPERATIONS(instruction_flags)
 
 struct direct_address
 {
@@ -105,15 +99,7 @@ enum class immediate_flags : uint16_t
     relative_jump_displacement = 1 << 0,
 };
 
-constexpr immediate_flags operator|(immediate_flags f1, immediate_flags f2)
-{
-    return static_cast<immediate_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
-}
-
-constexpr immediate_flags operator&(immediate_flags f1, immediate_flags f2)
-{
-    return static_cast<immediate_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
-}
+FLAG_OPERATIONS(immediate_flags)
 
 struct immediate
 {

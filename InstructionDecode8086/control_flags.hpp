@@ -3,6 +3,8 @@
 
 #include <cstdint>
 
+#include "flag_utils.hpp"
+
 enum class control_flags : uint16_t
 {
     none = 0,
@@ -17,42 +19,6 @@ enum class control_flags : uint16_t
     overflow = 1 << 11
 };
 
-constexpr control_flags operator|(control_flags f1, control_flags f2)
-{
-    return static_cast<control_flags>(static_cast<uint16_t>(f1) | static_cast<uint16_t>(f2));
-}
-
-constexpr control_flags operator&(control_flags f1, control_flags f2)
-{
-    return static_cast<control_flags>(static_cast<uint16_t>(f1) & static_cast<uint16_t>(f2));
-}
-
-constexpr control_flags operator^(control_flags f1, control_flags f2)
-{
-    return static_cast<control_flags>(static_cast<uint16_t>(f1) ^ static_cast<uint16_t>(f2));
-}
-
-constexpr control_flags operator~(control_flags f)
-{
-    return static_cast<control_flags>(~static_cast<uint16_t>(f));
-}
-
-constexpr control_flags& operator|=(control_flags& f1, control_flags f2)
-{
-    f1 = f1 | f2;
-    return f1;
-}
-
-constexpr control_flags& operator&=(control_flags& f1, control_flags f2)
-{
-    f1 = f1 & f2;
-    return f1;
-}
-
-constexpr control_flags& operator^=(control_flags& f1, control_flags f2)
-{
-    f1 = f1 ^ f2;
-    return f1;
-}
+FLAG_OPERATIONS(control_flags)
 
 #endif
