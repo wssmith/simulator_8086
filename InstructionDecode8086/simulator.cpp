@@ -63,15 +63,15 @@ namespace
             case simulator_numeric_width::nibble:
                 return simulator_numeric_limits
                 {
-                    .min_signed = -128,
-                    .max_signed = 127,
+                    .min_signed = -8,
+                    .max_signed = 7,
                     .min_unsigned = 0,
-                    .max_unsigned = 255
+                    .max_unsigned = 15
                 };
         }
     }
 
-    control_flags compute_flags(int32_t existing, int32_t operand, int32_t result, bool wide_value)
+    control_flags compute_flags(int32_t existing, int32_t operand, int32_t result, bool wide_value, bool is_addition)
     {
         control_flags new_flags = control_flags::none;
 
@@ -87,21 +87,24 @@ namespace
         const auto width = wide_value ? simulator_numeric_width::word : simulator_numeric_width::byte;
         const auto limits = get_numeric_limits(width);
 
-        const bool existing_in_signed_range = existing <= limits.max_signed && existing >= limits.min_signed;
-        if (existing_in_signed_range && ((operand > 0 && result > limits.max_signed) || (operand < 0 && result < limits.min_signed)))
+        if (result > limits.max_signed || result < limits.min_signed)
             new_flags |= control_flags::overflow;
 
-        const bool existing_in_unsigned_range = existing <= limits.max_unsigned && existing >= limits.min_unsigned;
-        if (existing_in_unsigned_range && ((operand > 0 && result > limits.max_unsigned) || (operand < 0 && result < limits.min_unsigned)))
+        const auto existing_unsigned = static_cast<uint16_t>(existing);
+        const auto operand_unsigned = static_cast<uint16_t>(operand);
+        const auto result_unsigned = is_addition ? (existing_unsigned + operand_unsigned) : (existing_unsigned - operand_unsigned);
+
+        if (result_unsigned > limits.max_unsigned || result_unsigned < limits.min_unsigned)
             new_flags |= control_flags::carry;
 
-        /*
-        const auto aux_width = wide_value ? simulator_numeric_width::byte : simulator_numeric_width::nibble;
-        const auto aux_limits = get_numeric_limits(aux_width);
+        const auto aux_limits = get_numeric_limits(simulator_numeric_width::nibble);
 
-        if ((existing <= aux_limits.max_unsigned && existing >= aux_limits.min_unsigned) && ((operand > 0 && result > aux_limits.max_unsigned) || (operand < 0 && result < aux_limits.min_unsigned)))
+        const auto existing_nibble = existing & 0xF;
+        const auto operand_nibble = operand & 0xF;
+        const auto result_nibble = is_addition ? (existing_nibble + operand_nibble) : (existing_nibble - operand_nibble);
+
+        if (result_nibble > aux_limits.max_unsigned || result_nibble < aux_limits.min_unsigned)
             new_flags |= control_flags::aux_carry;
-        */
 
         return new_flags;
     }
@@ -162,8 +165,8 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         uint16_t new_value = old_value;
 
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
-        const auto signed_old_value = static_cast<int16_t>(old_value);
-        const auto signed_op_value = static_cast<int16_t>(op_value);
+        const auto old_value_signed = static_cast<int16_t>(old_value);
+        const auto op_value_signed = static_cast<int16_t>(op_value);
         const bool wide_value = (destination->count == 2);
 
         switch (inst.op)
@@ -188,12 +191,12 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             case operation_type::sub:
             case operation_type::cmp:
             {
-                int32_t operand = (destination->count == 1 && destination->offset == 0) ? signed_op_value << 8 : signed_op_value;
-                if (inst.op != operation_type::add)
-                    operand *= -1;
+                const int32_t operand = (destination->count == 1 && destination->offset == 0) ? op_value_signed << 8 : op_value_signed;
 
-                const int32_t result = signed_old_value + operand;
-                new_flags = compute_flags(signed_old_value, operand, result, wide_value);
+                const bool is_addition = (inst.op == operation_type::add);
+                const int32_t result = is_addition ? old_value_signed + operand : old_value_signed - operand;
+
+                new_flags = compute_flags(old_value_signed, operand, result, wide_value, is_addition);
 
                 if (inst.op != operation_type::cmp)
                     new_value = static_cast<uint16_t>(result);
