@@ -12,7 +12,6 @@
 #include <string>
 #include <vector>
 
-#include "control_flags.hpp"
 #include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
@@ -111,11 +110,11 @@ namespace
 
     void print_state_transition(std::ostringstream& stream, const char* destination_register, int width, uint16_t old_value, uint16_t new_value)
     {
-        std::ostringstream register_builder;
-        register_builder << destination_register << ":0x" << std::hex << old_value << "->0x" << new_value << std::dec;
+        std::ostringstream builder;
+        builder << destination_register << ":0x" << std::hex << old_value << "->0x" << new_value << std::dec;
 
         stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
-        stream << register_builder.str();
+        stream << builder.str();
     }
 
     void print_flags_transition(std::ostringstream& stream, const char* flag_register, int width, const simulation_step& step)
@@ -151,10 +150,14 @@ namespace
             print_empty_column(builder, column_width);
         }
 
-        print_state_transition(builder, "ip", column_width, step.old_ip, step.new_ip);
+        const auto ip_name = get_register_name({ .index = instruction_pointer_index, .offset = 0, .count = 2 });
+        print_state_transition(builder, ip_name, column_width, step.old_ip, step.new_ip);
 
         if (step.new_flags != step.old_flags)
-            print_flags_transition(builder, "flags", 10, step);
+        {
+            const auto flags_name = get_register_name({ .index = flags_index, .offset = 0, .count = 2 });
+            print_flags_transition(builder, flags_name, 10, step);
+        }
 
         return builder.str();
     }
@@ -171,9 +174,9 @@ namespace
 
             char const* register_name = get_register_name({ .index = i, .offset = 0, .count = 2 });
 
-            if (i == flags_register_index)
+            if (i == flags_index)
             {
-                const auto flags = static_cast<control_flags>(registers[flags_register_index]);
+                const auto flags = static_cast<control_flags>(registers[flags_index]);
 
                 builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
                 builder << register_name << ": " << get_flag_string(flags) << '\n';

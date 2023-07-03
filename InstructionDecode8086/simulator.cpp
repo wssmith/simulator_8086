@@ -7,7 +7,6 @@
 #include <unordered_map>
 #include <variant>
 
-#include "control_flags.hpp"
 #include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
@@ -132,7 +131,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     const uint16_t old_ip = registers[instruction_pointer_index];
     uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
 
-    const auto old_flags = static_cast<control_flags>(registers[flags_register_index]);
+    const auto old_flags = static_cast<control_flags>(registers[flags_index]);
     control_flags new_flags = old_flags;
 
     auto matcher = overloaded
@@ -207,7 +206,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         registers[destination->index] = new_value;
 
         // update flags
-        registers[flags_register_index] = static_cast<uint16_t>(new_flags);
+        registers[flags_index] = static_cast<uint16_t>(new_flags);
 
         step = simulation_step
         {
