@@ -35,7 +35,12 @@ namespace
         int32_t max_unsigned{};
     };
 
-    enum class simulator_numeric_width : uint8_t { byte, word, nibble };
+    enum class simulator_numeric_width : uint8_t
+    {
+        byte,
+        word,
+        nibble
+    };
 
     constexpr simulator_numeric_limits get_numeric_limits(simulator_numeric_width width)
     {
