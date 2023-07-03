@@ -29,6 +29,9 @@ namespace
     {
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
 
+        if (!input_file.is_open())
+            throw std::exception("Cannot open binary file.");
+
         std::vector<uint8_t> data;
         std::for_each(std::istreambuf_iterator(input_file),
             std::istreambuf_iterator<char>(),
