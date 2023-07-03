@@ -37,13 +37,13 @@ namespace
 
     enum class simulator_numeric_width : uint8_t { byte, word, nibble };
 
-    simulator_numeric_limits get_numeric_limits(simulator_numeric_width width)
+    constexpr simulator_numeric_limits get_numeric_limits(simulator_numeric_width width)
     {
         switch (width)
         {
             case simulator_numeric_width::byte:
             default:
-                return simulator_numeric_limits
+                return
                 {
                     .min_signed = std::numeric_limits<int8_t>::min(),
                     .max_signed = std::numeric_limits<int8_t>::max(),
@@ -52,7 +52,7 @@ namespace
                 };
 
             case simulator_numeric_width::word:
-                return simulator_numeric_limits
+                return
                 {
                     .min_signed = std::numeric_limits<int16_t>::min(),
                     .max_signed = std::numeric_limits<int16_t>::max(),
@@ -61,7 +61,7 @@ namespace
                 };
 
             case simulator_numeric_width::nibble:
-                return simulator_numeric_limits
+                return
                 {
                     .min_signed = -8,
                     .max_signed = 7,
@@ -84,8 +84,9 @@ namespace
         if ((result & 0x8000) != 0)
             new_flags |= control_flags::sign;
 
-        const auto width = wide_value ? simulator_numeric_width::word : simulator_numeric_width::byte;
-        const auto limits = get_numeric_limits(width);
+        constexpr auto byte_limits = get_numeric_limits(simulator_numeric_width::byte);
+        constexpr auto word_limits = get_numeric_limits(simulator_numeric_width::word);
+        const auto limits = wide_value ? word_limits : byte_limits;
 
         if (result > limits.max_signed || result < limits.min_signed)
             new_flags |= control_flags::overflow;
@@ -97,7 +98,7 @@ namespace
         if (result_unsigned > limits.max_unsigned || result_unsigned < limits.min_unsigned)
             new_flags |= control_flags::carry;
 
-        const auto aux_limits = get_numeric_limits(simulator_numeric_width::nibble);
+        constexpr auto aux_limits = get_numeric_limits(simulator_numeric_width::nibble);
 
         const auto existing_nibble = existing & 0xF;
         const auto operand_nibble = operand & 0xF;
