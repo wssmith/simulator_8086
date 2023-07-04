@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <optional>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -58,7 +59,7 @@ enum class instruction_flags : uint16_t
     rep_ne = 1 << 5,
 };
 
-FLAG_OPERATIONS(instruction_flags)
+FLAG_OPERATIONS(instruction_flags);
 
 struct direct_address
 {
@@ -99,7 +100,7 @@ enum class immediate_flags : uint16_t
     relative_jump_displacement = 1 << 0,
 };
 
-FLAG_OPERATIONS(immediate_flags)
+FLAG_OPERATIONS(immediate_flags);
 
 struct immediate
 {

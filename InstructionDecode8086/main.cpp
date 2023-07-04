@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <ios>
@@ -204,7 +205,7 @@ int main(int argc, char* argv[])
     if (argc < min_expected_args)
     {
         std::cout << usage_message << '\n';
-        return 1;
+        return EXIT_FAILURE;
     }
 
     sim86_arguments app_args{};
@@ -222,7 +223,7 @@ int main(int argc, char* argv[])
         else
         {
             std::cout << "Unrecognized argument '" << argv[1] << "'.\n\n" << usage_message << '\n';
-            return 1;
+            return EXIT_FAILURE;
         }
     }
 
@@ -242,7 +243,7 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
-        std::array<uint16_t, register_count> registers{};
+        std::array<uint16_t, register_count> registers = {};
 
         // decode instruction
         while (data_iter < data_end)
@@ -296,4 +297,6 @@ int main(int argc, char* argv[])
     {
         std::cout << "UNKNOWN ERROR!!\n";
     }
+
+    return EXIT_SUCCESS;
 }

@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <string>
+#include <type_traits>
 
 #include "decoder.hpp"
 
@@ -23,7 +24,7 @@ enum class control_flags : uint16_t
     overflow = 1 << 11
 };
 
-FLAG_OPERATIONS(control_flags)
+FLAG_OPERATIONS(control_flags);
 
 struct simulation_step
 {
