@@ -165,23 +165,23 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
     simulation_step step;
 
-    if (const register_access* destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+    if (const register_access* reg_destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
     {
-        const uint16_t old_value = registers[destination->index];
+        const uint16_t old_value = registers[reg_destination->index];
         uint16_t new_value = old_value;
 
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
         const auto old_value_signed = static_cast<int16_t>(old_value);
         const auto op_value_signed = static_cast<int16_t>(op_value);
-        const bool wide_value = (destination->count == 2);
+        const bool wide_value = (reg_destination->count == 2);
 
         switch (inst.op)
         {
             case operation_type::mov:
             {
-                if (destination->count == 1)
+                if (reg_destination->count == 1)
                 {
-                    if (destination->offset == 0)
+                    if (reg_destination->offset == 0)
                         new_value = (old_value & 0xFF) + (op_value << 8);
                     else
                         new_value = (old_value & 0xFF00) + op_value;
@@ -197,7 +197,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             case operation_type::sub:
             case operation_type::cmp:
             {
-                const int32_t operand = (destination->count == 1 && destination->offset == 0) ? op_value_signed << 8 : op_value_signed;
+                const int32_t operand = (reg_destination->count == 1 && reg_destination->offset == 0) ? op_value_signed << 8 : op_value_signed;
 
                 const bool is_addition = (inst.op == operation_type::add);
                 const int32_t result = is_addition ? old_value_signed + operand : old_value_signed - operand;
@@ -212,14 +212,14 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         }
 
         // write to registers
-        registers[destination->index] = new_value;
+        registers[reg_destination->index] = new_value;
 
         // update flags
         registers[flags_index] = static_cast<uint16_t>(new_flags);
 
         step = simulation_step
         {
-            .destination = *destination,
+            .destination = *reg_destination,
             .old_value = old_value,
             .new_value = new_value,
             .old_flags = old_flags,
@@ -230,7 +230,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     }
     else if (const immediate* displacement = std::get_if<immediate>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
     {
-        auto register_update = register_access
+        auto reg_update = register_access
         {
             .index = instruction_pointer_index,
             .offset = 0,
@@ -304,7 +304,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             case operation_type::loop:
             case operation_type::jcxz:
             {
-                register_update = register_access
+                reg_update = register_access
                 {
                     .index = counter_register_index,
                     .offset = 0,
@@ -348,7 +348,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
         step = simulation_step
         {
-            .destination = register_update,
+            .destination = reg_update,
             .old_value = old_value,
             .new_value = new_value,
             .old_flags = old_flags,

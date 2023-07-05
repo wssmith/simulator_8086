@@ -177,7 +177,8 @@ namespace
             if (reg_value == 0)
                 continue;
 
-            char const* register_name = get_register_name({ .index = i, .offset = 0, .count = 2 });
+            const auto index = static_cast<register_index>(i);
+            char const* register_name = get_register_name({ .index = index, .offset = 0, .count = 2 });
 
             if (i == flags_index)
             {
