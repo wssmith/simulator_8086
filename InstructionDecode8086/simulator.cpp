@@ -144,7 +144,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     auto matcher = overloaded
     {
         [](const effective_address_expression&) -> uint16_t { return 0; },
-        [](direct_address) -> uint16_t { return 0; },
+        [](direct_address address) -> uint16_t { return memory[address.address]; },
         [&registers](const register_access& operand) -> uint16_t
         {
             if (operand.count == 1)
@@ -163,23 +163,25 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
     simulation_step step;
 
-    if (const register_access* reg_destination = std::get_if<register_access>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+    if (std::holds_alternative<register_access>(inst.operands[0]))
     {
-        const uint16_t old_value = registers[reg_destination->index];
+        const register_access reg_destination = std::get<register_access>(inst.operands[0]);
+
+        const uint16_t old_value = registers[reg_destination.index];
         uint16_t new_value = old_value;
 
         const uint16_t op_value = std::visit(matcher, inst.operands[1]);
         const auto old_value_signed = static_cast<int16_t>(old_value);
         const auto op_value_signed = static_cast<int16_t>(op_value);
-        const bool wide_value = (reg_destination->count == 2);
+        const bool wide_value = (reg_destination.count == 2);
 
         switch (inst.op)
         {
             case operation_type::mov:
             {
-                if (reg_destination->count == 1)
+                if (reg_destination.count == 1)
                 {
-                    if (reg_destination->offset == 0)
+                    if (reg_destination.offset == 0)
                         new_value = (old_value & 0xFF) + (op_value << 8);
                     else
                         new_value = (old_value & 0xFF00) + op_value;
@@ -195,7 +197,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             case operation_type::sub:
             case operation_type::cmp:
             {
-                const int32_t operand = (reg_destination->count == 1 && reg_destination->offset == 0) ? op_value_signed << 8 : op_value_signed;
+                const int32_t operand = (reg_destination.count == 1 && reg_destination.offset == 0) ? op_value_signed << 8 : op_value_signed;
 
                 const bool is_addition = (inst.op == operation_type::add);
                 const int32_t result = is_addition ? old_value_signed + operand : old_value_signed - operand;
@@ -210,14 +212,14 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         }
 
         // write to registers
-        registers[reg_destination->index] = new_value;
+        registers[reg_destination.index] = new_value;
 
         // update flags
         registers[flags_index] = static_cast<uint16_t>(new_flags);
 
         step = simulation_step
         {
-            .destination = *reg_destination,
+            .destination = reg_destination,
             .old_value = old_value,
             .new_value = new_value,
             .old_flags = old_flags,
@@ -226,8 +228,10 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             .new_ip = new_ip
         };
     }
-    else if (const immediate* displacement = std::get_if<immediate>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
+    else if (std::holds_alternative<immediate>(inst.operands[0]))
     {
+        const immediate displacement = std::get<immediate>(inst.operands[0]);
+
         auto reg_update = register_access
         {
             .index = instruction_pointer_index,
@@ -342,15 +346,86 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         }
 
         if (do_jump)
-            new_ip += displacement->value;
+            new_ip += displacement.value;
 
         step = simulation_step
         {
             .destination = reg_update,
             .old_value = old_value,
             .new_value = new_value,
-            .old_flags = old_flags,
-            .new_flags = new_flags,
+            .old_ip = old_ip,
+            .new_ip = new_ip
+        };
+    }
+    else if (std::holds_alternative<effective_address_expression>(inst.operands[0]))
+    {
+        const auto expression = std::get<effective_address_expression>(inst.operands[0]);
+
+        const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+
+        uint32_t term1_index = expression.term1.reg.index;
+        uint32_t address = registers[term1_index] + expression.displacement;
+
+        if (expression.term2.has_value())
+        {
+            uint32_t term2_index = expression.term2.value().reg.index;
+            address += registers[term2_index];
+        }
+
+        switch (inst.op)
+        {
+            case operation_type::mov:
+            {
+                if (has_any_flag(inst.flags, instruction_flags::wide))
+                {
+                    memory[address] = op_value & 0xFF;
+                    memory[address + 1] = (op_value >> 4) & 0xFF;
+                }
+                else
+                {
+                    memory[address] = op_value & 0xFF;
+                }
+                break;
+            }
+
+            default:
+                break;
+        }
+
+        step = simulation_step
+        {
+            .old_ip = old_ip,
+            .new_ip = new_ip
+        };
+    }
+    else if (std::holds_alternative<direct_address>(inst.operands[0]))
+    {
+        const uint32_t address = std::get<direct_address>(inst.operands[0]).address;
+
+        const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+
+        switch (inst.op)
+        {
+            case operation_type::mov:
+            {
+                if (has_any_flag(inst.flags, instruction_flags::wide))
+                {
+                    memory[address] = op_value & 0xFF;
+                    memory[address + 1] = (op_value >> 4) & 0xFF;
+                }
+                else
+                {
+                    memory[address] = op_value & 0xFF;
+                }
+                break;
+            }
+            
+            default:
+                break;
+        }
+
+        step = simulation_step
+        {
             .old_ip = old_ip,
             .new_ip = new_ip
         };

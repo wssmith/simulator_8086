@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
             instruction_list.push_back(inst);
 
             // print instruction
-            constexpr int column_width = 20;
+            constexpr int column_width = 21;
             std::string asm_line = print_instruction(inst);
             std::cout << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
             std::cout << asm_line;
