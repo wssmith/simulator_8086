@@ -21,6 +21,8 @@
 
 namespace
 {
+    using namespace std::string_literals;
+
     struct sim86_arguments
     {
         const char* input_path = nullptr;
@@ -52,8 +54,6 @@ namespace
 
     std::string print_instruction(const instruction& inst)
     {
-        using std::string_literals::operator ""s;
-
         const char* mnemonic = get_mneumonic(inst.op);
 
         auto matcher = overloaded
@@ -124,8 +124,6 @@ namespace
 
     void print_flags_transition(std::ostringstream& stream, const char* flag_register, int width, const simulation_step& step)
     {
-        using std::string_literals::operator ""s;
-
         stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
         stream << flag_register + ":"s + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
     }
@@ -182,7 +180,7 @@ namespace
 
             if (i == flags_index)
             {
-                const auto flags = static_cast<control_flags>(registers[flags_index]);
+                const auto flags = control_flags{ registers[flags_index] };
 
                 builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
                 builder << register_name << ": " << get_flag_string(flags) << '\n';

@@ -123,10 +123,8 @@ std::string get_flag_string(control_flags flags)
     uint16_t flag_value = 1;
     while ((flag_value & 0xFFF) != 0)
     {
-        auto flag_to_test = static_cast<control_flags>(flag_value);
-
-        if (flag_names.contains(flag_to_test) && has_any_flag(flag_to_test, flags))
-            flag_string += flag_names[flag_to_test];
+        if (auto flag = control_flags{ flag_value }; flag_names.contains(flag) && has_all_flags(flags, flag))
+            flag_string += flag_names[flag];
 
         flag_value <<= 1;
     }
@@ -140,7 +138,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     const uint16_t old_ip = registers[instruction_pointer_index];
     uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
 
-    const auto old_flags = static_cast<control_flags>(registers[flags_index]);
+    const auto old_flags = control_flags{ registers[flags_index] };
     control_flags new_flags = old_flags;
 
     auto matcher = overloaded
