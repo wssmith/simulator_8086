@@ -16,6 +16,7 @@
 #include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
+#include "instruction.hpp"
 #include "simulator.hpp"
 
 namespace

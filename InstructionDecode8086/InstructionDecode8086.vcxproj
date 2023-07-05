@@ -137,9 +137,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="decoder.hpp" />
-    <ClInclude Include="instruction_fields.hpp" />
-    <ClInclude Include="opcode.hpp" />
     <ClInclude Include="overloaded.hpp" />
+    <ClInclude Include="register_access.hpp" />
+    <ClInclude Include="instruction.hpp" />
     <ClInclude Include="simulator.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

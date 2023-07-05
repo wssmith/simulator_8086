@@ -29,12 +29,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="opcode.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="instruction_fields.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="decoder.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -42,6 +36,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="simulator.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="instruction.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="register_access.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

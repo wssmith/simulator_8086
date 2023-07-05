@@ -6,7 +6,8 @@
 #include <string>
 #include <type_traits>
 
-#include "decoder.hpp"
+#include "flag_utils.hpp"
+#include "register_access.hpp"
 
 struct instruction;
 

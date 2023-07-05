@@ -3,13 +3,11 @@
 #include <bit>
 #include <cstdint>
 #include <limits>
-#include <string>
 #include <unordered_map>
 #include <variant>
 
-#include "flag_utils.hpp"
-#include "decoder.hpp"
 #include "overloaded.hpp"
+#include "instruction.hpp"
 
 namespace
 {
@@ -232,7 +230,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     }
     else if (const immediate* displacement = std::get_if<immediate>(&inst.operands[0]))  // NOLINT(readability-container-data-pointer)
     {
-        auto destination = register_access
+        auto register_update = register_access
         {
             .index = instruction_pointer_index,
             .offset = 0,
@@ -306,7 +304,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             case operation_type::loop:
             case operation_type::jcxz:
             {
-                destination = register_access
+                register_update = register_access
                 {
                     .index = counter_register_index,
                     .offset = 0,
@@ -350,7 +348,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
         step = simulation_step
         {
-            .destination = destination,
+            .destination = register_update,
             .old_value = old_value,
             .new_value = new_value,
             .old_flags = old_flags,
