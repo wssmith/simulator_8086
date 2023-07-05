@@ -2,13 +2,13 @@
 #include <array>
 #include <cstdint>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <ios>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
-#include <optional>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -34,7 +34,7 @@ namespace
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
 
         if (!input_file.is_open())
-            throw std::exception("Cannot open binary file.");
+            throw std::exception{ "Cannot open binary file." };
 
         std::vector<uint8_t> data;
         std::for_each(std::istreambuf_iterator(input_file),
@@ -248,14 +248,10 @@ int main(int argc, char* argv[])
         // decode instruction
         while (data_iter < data_end)
         {
-            std::optional<instruction> inst_result = decode_instruction(data_iter, data_end, current_address);
-            if (!inst_result.has_value())
-                continue;
-
-            instruction_list.push_back(inst_result.value());
-
-            const instruction& inst = instruction_list.back();
+            instruction inst = decode_instruction(data_iter, data_end, current_address);
             current_address += inst.size;
+
+            instruction_list.push_back(inst);
 
             // print instruction
             constexpr int column_width = 20;
@@ -268,8 +264,8 @@ int main(int argc, char* argv[])
             {
                 simulation_step step = simulate_instruction(inst, registers);
 
-                int32_t actual_ip_change = step.new_ip - step.old_ip;
-                int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size));
+                const int32_t actual_ip_change = step.new_ip - step.old_ip;
+                const int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size));
                 if (delta != 0)
                     std::advance(data_iter, delta);
 

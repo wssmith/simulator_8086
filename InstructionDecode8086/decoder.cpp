@@ -1,6 +1,7 @@
 ﻿#include "decoder.hpp"
 
 #include <array>
+#include <exception>
 #include <utility>
 #include <unordered_map>
 
@@ -423,7 +424,7 @@ namespace
         };
     }
 
-    std::optional<instruction> decode_instruction(const instruction_fields& fields, uint32_t address)
+    instruction decode_instruction(const instruction_fields& fields, uint32_t address)
     {
         instruction inst
         {
@@ -727,15 +728,14 @@ namespace
     }
 }
 
-std::optional<instruction> decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address)
+instruction decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address)
 {
     const std::optional<instruction_fields> fields_result = read_fields(data_iter, data_end);
-    if (fields_result.has_value())
-    {
-        const std::optional<instruction> inst = decode_instruction(fields_result.value(), address);
-        return inst;
-    }
-    return {};
+
+    if (!fields_result.has_value())
+        throw std::exception{ "Failed to read instruction." };
+
+    return decode_instruction(fields_result.value(), address);
 }
 
 char const* get_register_name(const register_access& reg_access)
