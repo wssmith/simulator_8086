@@ -141,7 +141,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     const auto old_flags = control_flags{ registers[flags_index] };
     control_flags new_flags = old_flags;
 
-    auto matcher = overloaded
+    auto source_matcher = overloaded
     {
         [](const effective_address_expression&) -> uint16_t { return 0; },
         [](direct_address address) -> uint16_t { return memory[address.address]; },
@@ -170,7 +170,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         const uint16_t old_value = registers[reg_destination.index];
         uint16_t new_value = old_value;
 
-        const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+        const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
         const auto old_value_signed = static_cast<int16_t>(old_value);
         const auto op_value_signed = static_cast<int16_t>(op_value);
         const bool wide_value = (reg_destination.count == 2);
@@ -361,7 +361,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     {
         const auto expression = std::get<effective_address_expression>(inst.operands[0]);
 
-        const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+        const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
 
         uint32_t term1_index = expression.term1.reg.index;
         uint32_t address = registers[term1_index] + expression.displacement;
@@ -402,7 +402,7 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
     {
         const uint32_t address = std::get<direct_address>(inst.operands[0]).address;
 
-        const uint16_t op_value = std::visit(matcher, inst.operands[1]);
+        const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
 
         switch (inst.op)
         {
