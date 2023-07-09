@@ -4,6 +4,7 @@
 #include <exception>
 #include <utility>
 #include <unordered_map>
+#include <string>
 
 #include "instruction.hpp"
 
@@ -133,6 +134,8 @@ namespace
 
         count
     };
+
+    using opcode_type = std::underlying_type_t<opcode>;
 
     std::unordered_map<opcode, operation_type> opcode_translation
     {
@@ -274,47 +277,33 @@ namespace
         }
     }
 
-    bool read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
+    void read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
     {
         if (iter == iter_end)
-            return false;
-
+            throw std::exception{ "Cannot dereference out-of-range iterator for binary data." };
+        
         b = *iter++;
-
-        return true;
     }
 
-    bool read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
+    void read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
     {
         const int8_t displacement_bytes = get_displacement_bytes(fields.mod, fields.rm);
 
         if (displacement_bytes > 0)
         {
-            if (!read_and_advance(iter, iter_end, fields.disp_lo))
-                return false;
+            read_and_advance(iter, iter_end, fields.disp_lo);
 
             if (displacement_bytes > 1)
-            {
-                if (!read_and_advance(iter, iter_end, fields.disp_hi))
-                    return false;
-            }
+                read_and_advance(iter, iter_end, fields.disp_hi);
         }
-
-        return true;
     }
 
-    bool read_data(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
+    void read_data(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
     {
-        if (!read_and_advance(iter, iter_end, fields.data_lo))
-            return false;
+        read_and_advance(iter, iter_end, fields.data_lo);
 
         if (fields.w && !fields.s)
-        {
-            if (!read_and_advance(iter, iter_end, fields.data_hi))
-                return false;
-        }
-
-        return true;
+            read_and_advance(iter, iter_end, fields.data_hi);
     }
 
     int16_t get_instruction_data(const instruction_fields& fields)
@@ -424,7 +413,7 @@ namespace
         };
     }
 
-    instruction decode_instruction(const instruction_fields& fields, uint32_t address)
+    instruction decode_fields(const instruction_fields& fields, uint32_t address)
     {
         instruction inst
         {
@@ -568,156 +557,145 @@ namespace
 
             default:
             case opcode::none:
-                return {};
+                std::string error_message = "Unrecognized opcode while decoding fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
+                throw std::exception{ error_message.c_str() };
         }
 
         return inst;
     }
 
-    std::optional<instruction_fields> read_fields(data_iterator& data_iter, const data_iterator& data_end)
+    instruction_fields read_fields(data_iterator& data_iter, const data_iterator& data_end)
     {
         const data_iterator initial_position = data_iter;
 
         instruction_fields fields{};
 
         uint8_t b = 0;
-        if (!read_and_advance(data_iter, data_end, b))
-            return {};
+        read_and_advance(data_iter, data_end, b);
 
         fields.opcode = read_opcode(b);
 
         switch (fields.opcode)
         {
-        case opcode::mov_normal:
-        case opcode::add_normal:
-        case opcode::sub_normal:
-        case opcode::cmp_normal:
-        {
-            fields.w = b & 1;
-            b >>= 1;
-            fields.d = b & 1;
-
-            if (!read_and_advance(data_iter, data_end, b))
-                return {};
-
-            fields.rm = b & 0b111;
-            b >>= 3;
-            fields.reg = b & 0b111;
-            b >>= 3;
-            fields.mod = b;
-
-            if (!read_displacement(data_iter, data_end, fields))
-                return {};
-
-            break;
-        }
-
-        case opcode::arithmetic_immediate:
-            fields.s = (b >> 1) & 1;
-            [[fallthrough]];
-
-        case opcode::mov_immediate_to_register_or_memory:
-        {
-            fields.w = b & 1;
-
-            if (!read_and_advance(data_iter, data_end, b))
-                return {};
-
-            fields.rm = b & 0b111;
-            b >>= 3;
-            uint8_t op = b & 0b111;
-            b >>= 3;
-            fields.mod = b;
-
-            if (fields.opcode == opcode::arithmetic_immediate)
+            case opcode::mov_normal:
+            case opcode::add_normal:
+            case opcode::sub_normal:
+            case opcode::cmp_normal:
             {
-                fields.opcode = [&op]
-                {
-                    switch (op)
-                    {
-                    case 0b000: return opcode::add_immediate_to_register_or_memory;
-                    case 0b101: return opcode::sub_immediate_from_register_or_memory;
-                    case 0b111: return opcode::cmp_immediate_with_register_or_memory;
-                    default:    return opcode::none;
-                    }
-                }();
+                fields.w = b & 1;
+                b >>= 1;
+                fields.d = b & 1;
+
+                read_and_advance(data_iter, data_end, b);
+
+                fields.rm = b & 0b111;
+                b >>= 3;
+                fields.reg = b & 0b111;
+                b >>= 3;
+                fields.mod = b;
+
+                read_displacement(data_iter, data_end, fields);
+
+                break;
             }
 
-            if (!read_displacement(data_iter, data_end, fields))
-                return {};
-            if (!read_data(data_iter, data_end, fields))
-                return {};
+            case opcode::arithmetic_immediate:
+                fields.s = (b >> 1) & 1;
+                [[fallthrough]];
 
-            break;
-        }
+            case opcode::mov_immediate_to_register_or_memory:
+            {
+                fields.w = b & 1;
 
-        case opcode::mov_immediate_to_register:
-            fields.reg = b & 0b111;
-            b >>= 3;
-            [[fallthrough]];
+                read_and_advance(data_iter, data_end, b);
 
-        case opcode::add_immediate_to_accumulator:
-        case opcode::sub_immediate_from_accumulator:
-        case opcode::cmp_immediate_with_accumulator:
-        case opcode::mov_memory_to_accumulator:
-        case opcode::mov_accumulator_to_memory:
-        {
-            fields.w = b & 1;
+                fields.rm = b & 0b111;
+                b >>= 3;
+                uint8_t op = b & 0b111;
+                b >>= 3;
+                fields.mod = b;
 
-            if (!read_data(data_iter, data_end, fields))
-                return {};
+                if (fields.opcode == opcode::arithmetic_immediate)
+                {
+                    fields.opcode = [&op]
+                    {
+                        switch (op)
+                        {
+                        case 0b000: return opcode::add_immediate_to_register_or_memory;
+                        case 0b101: return opcode::sub_immediate_from_register_or_memory;
+                        case 0b111: return opcode::cmp_immediate_with_register_or_memory;
+                        default:    return opcode::none;
+                        }
+                    }();
+                }
 
-            break;
-        }
+                read_displacement(data_iter, data_end, fields);
+                read_data(data_iter, data_end, fields);
 
-        case opcode::mov_to_segment_register:
-        case opcode::mov_from_segment_register:
-        {
-            if (!read_and_advance(data_iter, data_end, b))
-                return {};
+                break;
+            }
 
-            fields.rm = b & 0b111;
-            b >>= 3;
-            fields.sr = b & 0b11;
-            b >>= 3;
-            fields.mod = b;
+            case opcode::mov_immediate_to_register:
+                fields.reg = b & 0b111;
+                b >>= 3;
+                [[fallthrough]];
 
-            if (!read_displacement(data_iter, data_end, fields))
-                return {};
+            case opcode::add_immediate_to_accumulator:
+            case opcode::sub_immediate_from_accumulator:
+            case opcode::cmp_immediate_with_accumulator:
+            case opcode::mov_memory_to_accumulator:
+            case opcode::mov_accumulator_to_memory:
+            {
+                fields.w = b & 1;
 
-            break;
-        }
+                read_data(data_iter, data_end, fields);
+                break;
+            }
 
-        case opcode::je:
-        case opcode::jl:
-        case opcode::jle:
-        case opcode::jb:
-        case opcode::jbe:
-        case opcode::jp:
-        case opcode::jo:
-        case opcode::js:
-        case opcode::jne:
-        case opcode::jnl:
-        case opcode::jg:
-        case opcode::jnb:
-        case opcode::ja:
-        case opcode::jnp:
-        case opcode::jno:
-        case opcode::jns:
-        case opcode::loop:
-        case opcode::loopz:
-        case opcode::loopnz:
-        case opcode::jcxz:
-        {
-            if (!read_and_advance(data_iter, data_end, fields.data_lo))
-                return {};
+            case opcode::mov_to_segment_register:
+            case opcode::mov_from_segment_register:
+            {
+                read_and_advance(data_iter, data_end, b);
 
-            break;
-        }
+                fields.rm = b & 0b111;
+                b >>= 3;
+                fields.sr = b & 0b11;
+                b >>= 3;
+                fields.mod = b;
 
-        default:
-        case opcode::none:
-            return {};
+                read_displacement(data_iter, data_end, fields);
+                break;
+            }
+
+            case opcode::je:
+            case opcode::jl:
+            case opcode::jle:
+            case opcode::jb:
+            case opcode::jbe:
+            case opcode::jp:
+            case opcode::jo:
+            case opcode::js:
+            case opcode::jne:
+            case opcode::jnl:
+            case opcode::jg:
+            case opcode::jnb:
+            case opcode::ja:
+            case opcode::jnp:
+            case opcode::jno:
+            case opcode::jns:
+            case opcode::loop:
+            case opcode::loopz:
+            case opcode::loopnz:
+            case opcode::jcxz:
+            {
+                read_and_advance(data_iter, data_end, fields.data_lo);
+                break;
+            }
+
+            default:
+            case opcode::none:
+                std::string error_message = "Unrecognized opcode while reading fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
+                throw std::exception{ error_message.c_str() };
         }
 
         const data_iterator final_position = data_iter;
@@ -730,12 +708,8 @@ namespace
 
 instruction decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address)
 {
-    const std::optional<instruction_fields> fields_result = read_fields(data_iter, data_end);
-
-    if (!fields_result.has_value())
-        throw std::exception{ "Failed to read instruction." };
-
-    return decode_instruction(fields_result.value(), address);
+    instruction_fields fields = read_fields(data_iter, data_end);
+    return decode_fields(fields, address);
 }
 
 char const* get_register_name(const register_access& reg_access)
