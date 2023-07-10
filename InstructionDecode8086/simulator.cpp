@@ -143,7 +143,15 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
 
     auto source_matcher = overloaded
     {
-        [](const effective_address_expression&) -> uint16_t { return 0; },
+        [&registers](const effective_address_expression& eae) -> uint16_t
+        {
+            int32_t address = registers[eae.term1.reg.index] + eae.displacement;
+
+            if (eae.term2.has_value())
+                address += registers[eae.term2.value().reg.index];
+
+            return memory[address];
+        },
         [](direct_address address) -> uint16_t { return memory[address.address]; },
         [&registers](const register_access& operand) -> uint16_t
         {
