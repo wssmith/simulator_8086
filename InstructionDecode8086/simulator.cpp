@@ -365,50 +365,25 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
             .new_ip = new_ip
         };
     }
-    else if (std::holds_alternative<effective_address_expression>(inst.operands[0]))
+    else if (std::holds_alternative<direct_address>(inst.operands[0]) || std::holds_alternative<effective_address_expression>(inst.operands[0]))
     {
-        const auto expression = std::get<effective_address_expression>(inst.operands[0]);
-
-        const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
-
-        uint32_t term1_index = expression.term1.reg.index;
-        uint32_t address = registers[term1_index] + expression.displacement;
-
-        if (expression.term2.has_value())
+        uint32_t address{};
+        if (std::holds_alternative<direct_address>(inst.operands[0]))
         {
-            uint32_t term2_index = expression.term2.value().reg.index;
-            address += registers[term2_index];
+            address = std::get<direct_address>(inst.operands[0]).address;
         }
-
-        switch (inst.op)
+        else
         {
-            case operation_type::mov:
+            const auto expression = std::get<effective_address_expression>(inst.operands[0]);
+            uint32_t term1_index = expression.term1.reg.index;
+            address = registers[term1_index] + expression.displacement;
+
+            if (expression.term2.has_value())
             {
-                if (has_any_flag(inst.flags, instruction_flags::wide))
-                {
-                    memory[address] = op_value & 0xFF;
-                    memory[address + 1] = (op_value >> 4) & 0xFF;
-                }
-                else
-                {
-                    memory[address] = op_value & 0xFF;
-                }
-                break;
+                uint32_t term2_index = expression.term2.value().reg.index;
+                address += registers[term2_index];
             }
-
-            default:
-                break;
         }
-
-        step = simulation_step
-        {
-            .old_ip = old_ip,
-            .new_ip = new_ip
-        };
-    }
-    else if (std::holds_alternative<direct_address>(inst.operands[0]))
-    {
-        const uint32_t address = std::get<direct_address>(inst.operands[0]).address;
 
         const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
 
@@ -439,7 +414,6 @@ simulation_step simulate_instruction(const instruction& inst, std::array<uint16_
         };
     }
 
-    // update instruction pointer
     registers[instruction_pointer_index] = new_ip;
 
     return step;
