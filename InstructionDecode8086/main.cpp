@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <memory_resource>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -29,22 +30,19 @@ namespace
         bool execute_mode{};
     };
 
-    std::vector<uint8_t> read_binary_file(const std::string& path)
+    void read_binary_file(const std::string& path, std::pmr::vector<uint8_t>& data)
     {
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
 
         if (!input_file.is_open())
             throw std::exception{ "Cannot open binary file." };
 
-        std::vector<uint8_t> data;
         std::for_each(std::istreambuf_iterator(input_file),
             std::istreambuf_iterator<char>(),
             [&data](char c)
             {
                 data.push_back(c);
             });
-
-        return data;
     }
 
     std::string print_width(const instruction& inst)
@@ -235,8 +233,13 @@ int main(int argc, char* argv[])
 
     try
     {
-        // read binary file
-        const std::vector<uint8_t> data = read_binary_file(app_args.input_path);
+        // read binary file into memory's code segment
+        constexpr int segment_size = 64 * 1024;
+        uint8_t* code_segment = memory.data() + memory.size() - segment_size;
+        std::pmr::monotonic_buffer_resource pool{ code_segment, segment_size };
+        std::pmr::vector<uint8_t> data{ &pool };
+
+        read_binary_file(app_args.input_path, data);
 
         // read instructions
         auto data_iter = data.cbegin();

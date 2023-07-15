@@ -11,9 +11,6 @@
 
 namespace
 {
-    constexpr int memory_size = 1024 * 1024;
-    std::array<uint8_t, memory_size> memory = {};
-
     std::unordered_map<control_flags, char> flag_names
     {
         { control_flags::carry, 'C' },
