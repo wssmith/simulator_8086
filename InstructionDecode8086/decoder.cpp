@@ -70,7 +70,8 @@ namespace
         { operation_type::loop, "loop" },
         { operation_type::loopz, "loopz" },
         { operation_type::loopnz, "loopnz" },
-        { operation_type::jcxz, "jcxz" }
+        { operation_type::jcxz, "jcxz" },
+        { operation_type::nop, "nop" }
     };
 
     constexpr std::array<std::pair<register_access, std::optional<register_access>>, 8> effective_addresses =
@@ -132,6 +133,8 @@ namespace
         loopnz,
         jcxz,
 
+        nop,
+
         count
     };
 
@@ -178,7 +181,9 @@ namespace
         { opcode::loop, operation_type::loop },
         { opcode::loopz, operation_type::loopz },
         { opcode::loopnz, operation_type::loopnz },
-        { opcode::jcxz, operation_type::jcxz }
+        { opcode::jcxz, operation_type::jcxz },
+
+        { opcode::nop, operation_type::nop }
     };
 
     std::vector<std::unordered_map<uint8_t, opcode>> opcode_maps
@@ -187,26 +192,28 @@ namespace
             { 0b1000'1110, opcode::mov_to_segment_register },
             { 0b1000'1100, opcode::mov_from_segment_register },
 
-            { 0b0111'0100 , opcode::je },
-            { 0b0111'1100 , opcode::jl },
-            { 0b0111'1110 , opcode::jle },
-            { 0b0111'0010 , opcode::jb },
-            { 0b0111'0110 , opcode::jbe },
-            { 0b0111'1010 , opcode::jp },
-            { 0b0111'0000 , opcode::jo },
-            { 0b0111'1000 , opcode::js },
-            { 0b0111'0101 , opcode::jne },
-            { 0b0111'1101 , opcode::jnl },
-            { 0b0111'1111 , opcode::jg },
-            { 0b0111'0011 , opcode::jnb },
-            { 0b0111'0111 , opcode::ja },
-            { 0b0111'1011 , opcode::jnp },
-            { 0b0111'0001 , opcode::jno },
-            { 0b0111'1001 , opcode::jns },
-            { 0b1110'0010 , opcode::loop },
-            { 0b1110'0001 , opcode::loopz },
-            { 0b1110'0000 , opcode::loopnz },
-            { 0b1110'0011 , opcode::jcxz },
+            { 0b0111'0100, opcode::je },
+            { 0b0111'1100, opcode::jl },
+            { 0b0111'1110, opcode::jle },
+            { 0b0111'0010, opcode::jb },
+            { 0b0111'0110, opcode::jbe },
+            { 0b0111'1010, opcode::jp },
+            { 0b0111'0000, opcode::jo },
+            { 0b0111'1000, opcode::js },
+            { 0b0111'0101, opcode::jne },
+            { 0b0111'1101, opcode::jnl },
+            { 0b0111'1111, opcode::jg },
+            { 0b0111'0011, opcode::jnb },
+            { 0b0111'0111, opcode::ja },
+            { 0b0111'1011, opcode::jnp },
+            { 0b0111'0001, opcode::jno },
+            { 0b0111'1001, opcode::jns },
+            { 0b1110'0010, opcode::loop },
+            { 0b1110'0001, opcode::loopz },
+            { 0b1110'0000, opcode::loopnz },
+            { 0b1110'0011, opcode::jcxz },
+
+            { 0b1001'0000, opcode::nop }
         },
         {
             { 0b1100'011, opcode::mov_immediate_to_register_or_memory },
@@ -555,6 +562,9 @@ namespace
                 break;
             }
 
+            case opcode::nop:
+                break;
+
             default:
             case opcode::none:
                 std::string error_message = "Unrecognized opcode while decoding fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
@@ -691,6 +701,9 @@ namespace
                 read_and_advance(data_iter, data_end, fields.data_lo);
                 break;
             }
+
+            case opcode::nop:
+                break;
 
             default:
             case opcode::none:

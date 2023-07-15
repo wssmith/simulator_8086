@@ -106,7 +106,9 @@ namespace
         const std::string first_operand = std::visit(matcher, inst.operands[0]);
         const std::string second_operand = std::visit(matcher, inst.operands[1]);
 
-        std::string asm_line = mnemonic + " "s + first_operand;
+        std::string asm_line = mnemonic;
+        if (first_operand.length() != 0)
+            asm_line += " " + first_operand;
         if (second_operand.length() != 0)
             asm_line += ", " + second_operand;
 

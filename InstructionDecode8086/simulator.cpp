@@ -195,7 +195,13 @@ simulation_step simulate_instruction(const instruction& inst, register_array& re
     instruction_operand destination_op = inst.operands[0];
     const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
 
-    simulation_step step;
+    simulation_step step =
+    {
+        .old_flags = old_flags,
+        .new_flags = new_flags,
+        .old_ip = old_ip,
+        .new_ip = new_ip,
+    };
 
     if (const register_access* reg_destination = std::get_if<register_access>(&destination_op))
     {
@@ -409,12 +415,6 @@ simulation_step simulate_instruction(const instruction& inst, register_array& re
             default:
                 break;
         }
-
-        step = simulation_step
-        {
-            .old_ip = old_ip,
-            .new_ip = new_ip
-        };
     }
 
     registers[instruction_pointer_index] = new_ip;
