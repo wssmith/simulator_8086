@@ -165,7 +165,7 @@ namespace
         return builder.str();
     }
 
-    std::string print_register_contents(std::array<uint16_t, register_count> registers)
+    std::string print_register_contents(const register_array& registers)
     {
         std::ostringstream builder;
 
@@ -243,7 +243,7 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
-        std::array<uint16_t, register_count> registers = {};
+        register_array registers = {};
 
         // decode instruction
         while (data_iter < data_end)
