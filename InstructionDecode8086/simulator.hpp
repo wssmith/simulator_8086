@@ -44,13 +44,14 @@ inline constexpr int instruction_pointer_index = 12;
 inline constexpr int flags_index = 13;
 inline constexpr int register_count = 14;
 
+using register_array = std::array<uint16_t, register_count>;
+inline register_array registers = {};
+
 inline constexpr int memory_size = 1024 * 1024;
 inline std::array<uint8_t, memory_size> memory = {};
 
-using register_array = std::array<uint16_t, register_count>;
-
 std::string get_flag_string(control_flags flags);
 
-simulation_step simulate_instruction(const instruction& inst, register_array& registers);
+simulation_step simulate_instruction(const instruction& inst);
 
 #endif

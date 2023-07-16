@@ -12,6 +12,7 @@
 #include <memory_resource>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "flag_utils.hpp"
@@ -28,6 +29,7 @@ namespace
     {
         const char* input_path = nullptr;
         bool execute_mode{};
+        bool dump_memory{};
     };
 
     void read_binary_file(const std::string& path, std::pmr::vector<uint8_t>& data)
@@ -165,7 +167,7 @@ namespace
         return builder.str();
     }
 
-    std::string print_register_contents(const register_array& registers)
+    std::string print_register_contents()
     {
         std::ostringstream builder;
 
@@ -200,7 +202,7 @@ int main(int argc, char* argv[])
 {
     // read command line arguments
     constexpr int min_expected_args = 2;
-    constexpr const char* usage_message = "Usage: InstructionDecode8086 [-exec] input_file";
+    constexpr const char* usage_message = "Usage: InstructionDecode8086 [-exec] [-dump] input_file";
 
     if (argc < min_expected_args)
     {
@@ -208,23 +210,41 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    sim86_arguments app_args{};
-    if (argc == min_expected_args)
+    constexpr int not_found = -1;
+    int invalid_option_index = not_found;
+    const std::unordered_set<std::string> valid_options = { "-exec", "-dump" };
+
+    std::unordered_set<std::string> options;
+    for (int i = 1; i < (argc - 1); ++i)
     {
-        app_args.input_path = argv[1];
-    }
-    else
-    {
-        if (std::strcmp(argv[1], "-exec") == 0)
+        std::string option = argv[i];
+        std::transform(option.begin(), option.end(), option.begin(), ::tolower);
+
+        if (valid_options.contains(option))
         {
-            app_args.execute_mode = true;
-            app_args.input_path = argv[2];
+            options.emplace(option);
         }
         else
         {
-            std::cout << "Unrecognized argument '" << argv[1] << "'.\n\n" << usage_message << '\n';
-            return EXIT_FAILURE;
+            invalid_option_index = i;
+            break;
         }
+    }
+
+    sim86_arguments app_args;
+    if (invalid_option_index == not_found)
+    {
+        app_args = sim86_arguments
+        {
+            .input_path = argv[argc - 1],
+            .execute_mode = options.contains("-exec"),
+            .dump_memory = options.contains("-dump")
+        };
+    }
+    else
+    {
+        std::cout << "Unrecognized argument '" << argv[invalid_option_index] << "'.\n\n" << usage_message << '\n';
+        return EXIT_FAILURE;
     }
 
     std::string input_filename = std::filesystem::path(app_args.input_path).filename().string();
@@ -248,8 +268,6 @@ int main(int argc, char* argv[])
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
-        register_array registers = {};
-
         // decode instruction
         while (data_iter < data_end)
         {
@@ -267,7 +285,7 @@ int main(int argc, char* argv[])
             // execute instruction?
             if (app_args.execute_mode)
             {
-                simulation_step step = simulate_instruction(inst, registers);
+                simulation_step step = simulate_instruction(inst);
 
                 const int32_t actual_ip_change = step.new_ip - step.old_ip;
                 const int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size));
@@ -285,7 +303,7 @@ int main(int argc, char* argv[])
         if (app_args.execute_mode)
         {
             // print final contents of registers
-            const std::string register_contents = print_register_contents(registers);
+            const std::string register_contents = print_register_contents();
 
             std::cout << "\nFinal registers:\n" << register_contents;
         }

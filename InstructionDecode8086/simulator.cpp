@@ -112,7 +112,7 @@ namespace
         return new_flags;
     }
 
-    uint32_t get_address(const instruction_operand& destination_op, const register_array& registers)
+    uint32_t get_address(const instruction_operand& destination_op)
     {
         uint32_t address{};
 
@@ -152,7 +152,7 @@ std::string get_flag_string(control_flags flags)
     return flag_string;
 }
 
-simulation_step simulate_instruction(const instruction& inst, register_array& registers)
+simulation_step simulate_instruction(const instruction& inst)
 {
     // update instruction pointer
     const uint16_t old_ip = registers[instruction_pointer_index];
@@ -163,7 +163,7 @@ simulation_step simulate_instruction(const instruction& inst, register_array& re
 
     auto source_matcher = overloaded
     {
-        [&registers](const effective_address_expression& eae) -> uint16_t
+        [](const effective_address_expression& eae) -> uint16_t
         {
             int32_t address = registers[eae.term1.reg.index] + eae.displacement;
 
@@ -173,7 +173,7 @@ simulation_step simulate_instruction(const instruction& inst, register_array& re
             return memory[address];
         },
         [](direct_address address) -> uint16_t { return memory[address.address]; },
-        [&registers](const register_access& operand) -> uint16_t
+        [](const register_access& operand) -> uint16_t
         {
             if (operand.count == 1)
             {
@@ -391,7 +391,7 @@ simulation_step simulate_instruction(const instruction& inst, register_array& re
     }
     else if (std::holds_alternative<direct_address>(destination_op) || std::holds_alternative<effective_address_expression>(destination_op))
     {
-        uint32_t address = get_address(destination_op, registers);
+        uint32_t address = get_address(destination_op);
 
         switch (inst.op)
         {
