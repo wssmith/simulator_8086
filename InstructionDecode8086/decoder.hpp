@@ -2,14 +2,14 @@
 #define WS_DECODER_HPP
 
 #include <cstdint>
-#include <vector>
+#include <span>
 
 #include "register_access.hpp"
 
 struct instruction;
 enum class operation_type : uint32_t;
 
-using data_iterator = std::vector<uint8_t>::const_iterator;
+using data_iterator = std::span<uint8_t>::iterator;
 
 instruction decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address);
 

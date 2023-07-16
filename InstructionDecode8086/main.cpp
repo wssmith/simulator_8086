@@ -9,7 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
-#include <memory_resource>
+#include <span>
 #include <sstream>
 #include <string>
 #include <unordered_set>
@@ -32,8 +32,10 @@ namespace
         bool dump_memory{};
     };
 
-    void read_binary_file(const std::string& path, std::pmr::vector<uint8_t>& data)
+    std::vector<uint8_t> read_binary_file(const std::string& path)
     {
+        std::vector<uint8_t> data;
+
         std::ifstream input_file{ path, std::ios::in | std::ios::binary };
 
         if (!input_file.is_open())
@@ -45,6 +47,8 @@ namespace
             {
                 data.push_back(c);
             });
+
+        return data;
     }
 
     std::string print_width(const instruction& inst)
@@ -253,17 +257,21 @@ int main(int argc, char* argv[])
 
     try
     {
-        // read binary file into memory's code segment
+        // storing instructions in regular memory, so create a view into the code segment
         constexpr int segment_size = 64 * 1024;
         uint8_t* code_segment = memory.data() + memory.size() - segment_size;
-        std::pmr::monotonic_buffer_resource pool{ code_segment, segment_size };
-        std::pmr::vector<uint8_t> data{ &pool };
+        std::span<uint8_t> data{ code_segment, segment_size };
 
-        read_binary_file(app_args.input_path, data);
-
+        // read binary instructions into a buffer, then copy its contents to the code segment in memory and shrink the view
+        {
+            std::vector<uint8_t> data_buffer = read_binary_file(app_args.input_path);
+            std::copy(data_buffer.cbegin(), data_buffer.cend(), data.begin());
+            data = data.subspan(0, data_buffer.size());
+        }
+        
         // read instructions
-        auto data_iter = data.cbegin();
-        const auto data_end = data.cend();
+        auto data_iter = data.begin();
+        const auto data_end = data.end();
 
         std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
