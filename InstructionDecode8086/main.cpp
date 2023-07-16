@@ -218,7 +218,7 @@ int main(int argc, char* argv[])
     for (int i = 1; i < (argc - 1); ++i)
     {
         std::string option = argv[i];
-        std::transform(option.begin(), option.end(), option.begin(), ::tolower);
+        std::transform(option.begin(), option.end(), option.begin(), [](char c) { return std::tolower(c); });
 
         if (valid_options.contains(option))
         {
