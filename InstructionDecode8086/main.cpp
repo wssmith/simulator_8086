@@ -257,16 +257,22 @@ int main(int argc, char* argv[])
 
     try
     {
-        // storing instructions in regular memory, so create a view into the code segment
-        constexpr int segment_size = 64 * 1024;
-        uint8_t* code_segment = memory.data() + memory.size() - segment_size;
-        std::span<uint8_t> data{ code_segment, segment_size };
-
-        // read binary instructions into a buffer, then copy its contents to the code segment in memory and shrink the view
+        // read binary instructions into a buffer, then copy its contents to the code segment in memory via a view
+        std::span<uint8_t> data;
         {
+            constexpr int segment_size = 64 * 1024;
+            constexpr auto cs_location = memory.size() - segment_size;
+
+            registers[code_segment_index] = cs_location >> 4;
+
             std::vector<uint8_t> data_buffer = read_binary_file(app_args.input_path);
+
+            if (data_buffer.size() > segment_size)
+                throw std::exception{ "Instructions must fit within a single memory segment." };
+
+            constexpr uint8_t* code_segment = memory.data() + cs_location;
+            data = std::span<uint8_t>{ code_segment, data_buffer.size() };
             std::copy(data_buffer.cbegin(), data_buffer.cend(), data.begin());
-            data = data.subspan(0, data_buffer.size());
         }
         
         // read instructions
