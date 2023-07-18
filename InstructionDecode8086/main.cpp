@@ -320,6 +320,20 @@ int main(int argc, char* argv[])
             const std::string register_contents = print_register_contents();
 
             std::cout << "\nFinal registers:\n" << register_contents;
+
+            if (app_args.dump_memory)
+            {
+                // dump memory to a file
+                std::ofstream memory_dump;
+                memory_dump.open("dump.data", std::ios::binary);
+
+                for (uint8_t b : memory)
+                    memory_dump << b;
+
+                memory_dump.close();
+
+                std::cout << "\nSaved memory to a file.\n";
+            }
         }
     }
     catch (std::exception& ex)
