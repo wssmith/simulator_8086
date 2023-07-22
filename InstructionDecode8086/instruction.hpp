@@ -40,6 +40,8 @@ enum class operation_type : uint32_t
     loopnz,
     jcxz,
 
+    jmp,
+
     nop,
 
     count,

@@ -71,6 +71,7 @@ namespace
         { operation_type::loopz, "loopz" },
         { operation_type::loopnz, "loopnz" },
         { operation_type::jcxz, "jcxz" },
+        { operation_type::jmp, "jmp" },
         { operation_type::nop, "nop" }
     };
 
@@ -133,6 +134,12 @@ namespace
         loopnz,
         jcxz,
 
+        jmp_direct,
+        jmp_direct_short,
+        jmp_indirect,
+        jmp_indirect_near,
+        jmp_indirect_far,
+
         nop,
 
         count
@@ -183,6 +190,11 @@ namespace
         { opcode::loopnz, operation_type::loopnz },
         { opcode::jcxz, operation_type::jcxz },
 
+        { opcode::jmp_direct, operation_type::jmp },
+        { opcode::jmp_direct_short, operation_type::jmp },
+        { opcode::jmp_indirect_near, operation_type::jmp },
+        { opcode::jmp_indirect_far, operation_type::jmp },
+  
         { opcode::nop, operation_type::nop }
     };
 
@@ -212,6 +224,10 @@ namespace
             { 0b1110'0001, opcode::loopz },
             { 0b1110'0000, opcode::loopnz },
             { 0b1110'0011, opcode::jcxz },
+
+            { 0b1110'1001, opcode::jmp_direct },
+            { 0b1110'1011, opcode::jmp_direct_short },
+            { 0b1111'1111, opcode::jmp_indirect },
 
             { 0b1001'0000, opcode::nop }
         },
