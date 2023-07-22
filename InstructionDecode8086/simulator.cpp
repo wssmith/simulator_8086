@@ -375,6 +375,12 @@ simulation_step simulate_instruction(const instruction& inst)
                 }
                 break;
             }
+
+            case operation_type::jmp:
+            {
+                do_jump = true;
+                break;
+            }
         }
 
         if (do_jump)
@@ -406,6 +412,12 @@ simulation_step simulate_instruction(const instruction& inst)
                 {
                     memory[address] = op_value & 0xFF;
                 }
+                break;
+            }
+
+            case operation_type::jmp:
+            {
+                // todo
                 break;
             }
             
