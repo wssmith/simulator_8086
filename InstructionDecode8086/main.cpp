@@ -200,6 +200,17 @@ namespace
 
         return builder.str();
     }
+
+    void save_memory_dump(const char* filename)
+    {
+        std::ofstream memory_dump;
+        memory_dump.open(filename, std::ios::out | std::ios::binary);
+
+        for (const uint8_t b : memory)
+            memory_dump << b;
+
+        memory_dump.close();
+    }
 }
 
 int main(int argc, char* argv[])
@@ -318,21 +329,14 @@ int main(int argc, char* argv[])
         {
             // print final contents of registers
             const std::string register_contents = print_register_contents();
-
             std::cout << "\nFinal registers:\n" << register_contents;
 
             if (app_args.dump_memory)
             {
-                // dump memory to a file
-                std::ofstream memory_dump;
-                memory_dump.open("dump.data", std::ios::binary);
-
-                for (uint8_t b : memory)
-                    memory_dump << b;
-
-                memory_dump.close();
-
-                std::cout << "\nSaved memory to a file.\n";
+                // save memory to a file
+                constexpr auto dump_filename = "dump.data";
+                save_memory_dump(dump_filename);
+                std::cout << "\nSaved memory to '" << dump_filename << "'.\n";
             }
         }
     }
