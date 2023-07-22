@@ -122,12 +122,12 @@ namespace
         }
         else if (const auto* eae = std::get_if<effective_address_expression>(&destination_op))
         {
-            uint32_t term1_index = eae->term1.reg.index;
+            const uint32_t term1_index = eae->term1.reg.index;
             address = registers[term1_index] + eae->displacement;
 
             if (eae->term2.has_value())
             {
-                uint32_t term2_index = eae->term2.value().reg.index;
+                const uint32_t term2_index = eae->term2.value().reg.index;
                 address += registers[term2_index];
             }
         }
@@ -367,7 +367,7 @@ simulation_step simulate_instruction(const instruction& inst)
                         do_jump = new_value != 0 && !has_any_flag(old_flags, control_flags::zero);
                         break;
                     case operation_type::loop:
-                        do_jump = new_value == 0;
+                        do_jump = new_value != 0;
                         break;
                     case operation_type::jcxz:
                         do_jump = registers[counter_register_index] == 0;

@@ -707,7 +707,7 @@ namespace
 
             default:
             case opcode::none:
-                std::string error_message = "Unrecognized opcode while reading fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
+                const std::string error_message = "Unrecognized opcode while reading fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
                 throw std::exception{ error_message.c_str() };
         }
 
@@ -721,7 +721,7 @@ namespace
 
 instruction decode_instruction(data_iterator& data_iter, const data_iterator& data_end, uint32_t address)
 {
-    instruction_fields fields = read_fields(data_iter, data_end);
+    const instruction_fields fields = read_fields(data_iter, data_end);
     return decode_fields(fields, address);
 }
 

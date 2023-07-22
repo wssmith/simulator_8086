@@ -102,7 +102,11 @@ namespace
                     return "$" + (value >= 0 ? "+" + std::to_string(value) : "-" + std::to_string(-value));
                 }
 
-                return std::to_string(immediate_op.value);
+                if (has_any_flag(inst.flags, instruction_flags::wide))
+                    return std::to_string(static_cast<uint16_t>(immediate_op.value));
+                else
+                    return std::to_string(static_cast<uint8_t>(immediate_op.value));
+
             },
             [](std::monostate) { return ""s; }
         };
@@ -272,7 +276,9 @@ int main(int argc, char* argv[])
         std::span<uint8_t> data;
         {
             constexpr int segment_size = 64 * 1024;
-            constexpr auto cs_location = memory.size() - segment_size;
+            constexpr auto cs_location = 0;
+            //constexpr auto cs_location = 64 * 4 * 63;
+            //constexpr auto cs_location = memory.size() - segment_size;
 
             registers[code_segment_index] = cs_location >> 4;
 
@@ -282,7 +288,7 @@ int main(int argc, char* argv[])
                 throw std::exception{ "Instructions must fit within a single memory segment." };
 
             constexpr uint8_t* code_segment = memory.data() + cs_location;
-            data = std::span<uint8_t>{ code_segment, data_buffer.size() };
+            data = std::span{ code_segment, data_buffer.size() };
             std::copy(data_buffer.cbegin(), data_buffer.cend(), data.begin());
         }
         
@@ -290,7 +296,6 @@ int main(int argc, char* argv[])
         auto data_iter = data.begin();
         const auto data_end = data.end();
 
-        std::vector<instruction> instruction_list;
         uint32_t current_address = 0;
 
         // decode instruction
@@ -299,10 +304,8 @@ int main(int argc, char* argv[])
             instruction inst = decode_instruction(data_iter, data_end, current_address);
             current_address += inst.size;
 
-            instruction_list.push_back(inst);
-
             // print instruction
-            constexpr int column_width = 21;
+            constexpr int column_width = 22;
             std::string asm_line = print_instruction(inst);
             std::cout << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
             std::cout << asm_line;
