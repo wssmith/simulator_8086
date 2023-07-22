@@ -261,7 +261,6 @@ namespace
         uint8_t mod{};
         uint8_t reg{};
         uint8_t rm{};
-        uint8_t sr{};
         uint8_t disp_lo{};
         uint8_t disp_hi{};
         uint8_t data_lo{};
@@ -306,6 +305,17 @@ namespace
             throw std::exception{ "Cannot dereference out-of-range iterator for binary data." };
         
         b = *iter++;
+    }
+
+    void read_follow_byte(data_iterator& data_iter, const data_iterator& data_end, instruction_fields& fields, uint8_t& b)
+    {
+        read_and_advance(data_iter, data_end, b);
+
+        fields.rm = b & 0b111;
+        b >>= 3;
+        fields.reg = b & 0b111;
+        b >>= 3;
+        fields.mod = b;
     }
 
     void read_displacement(data_iterator& iter, const data_iterator& iter_end, instruction_fields& fields)
@@ -527,7 +537,7 @@ namespace
 
                 inst.operands[from_segment] = register_access
                 {
-                    .index = segment_register_index_map[fields.sr],
+                    .index = segment_register_index_map[fields.reg],
                     .offset = 0,
                     .count = 2
                 };
@@ -569,6 +579,8 @@ namespace
             case opcode::loopz:
             case opcode::loopnz:
             case opcode::jcxz:
+            case opcode::jmp_direct:
+            case opcode::jmp_direct_short:
             {
                 inst.operands[0] = immediate
                 {
@@ -578,13 +590,25 @@ namespace
                 break;
             }
 
+            case opcode::jmp_indirect_near:
+            case opcode::jmp_indirect_far:
+            {
+                inst.operands[0] = effective_address_expression
+                {
+                    // todo
+                };
+                break;
+            }
+
             case opcode::nop:
                 break;
 
             default:
             case opcode::none:
-                std::string error_message = "Unrecognized opcode while decoding fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
+            {
+                const std::string error_message = "Unrecognized opcode while decoding fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
                 throw std::exception{ error_message.c_str() };
+            }
         }
 
         return inst;
@@ -612,16 +636,8 @@ namespace
                 b >>= 1;
                 fields.d = b & 1;
 
-                read_and_advance(data_iter, data_end, b);
-
-                fields.rm = b & 0b111;
-                b >>= 3;
-                fields.reg = b & 0b111;
-                b >>= 3;
-                fields.mod = b;
-
+                read_follow_byte(data_iter, data_end, fields, b);
                 read_displacement(data_iter, data_end, fields);
-
                 break;
             }
 
@@ -632,25 +648,18 @@ namespace
             case opcode::mov_immediate_to_register_or_memory:
             {
                 fields.w = b & 1;
-
-                read_and_advance(data_iter, data_end, b);
-
-                fields.rm = b & 0b111;
-                b >>= 3;
-                uint8_t op = b & 0b111;
-                b >>= 3;
-                fields.mod = b;
+                read_follow_byte(data_iter, data_end, fields, b);
 
                 if (fields.opcode == opcode::arithmetic_immediate)
                 {
-                    fields.opcode = [&op]
+                    fields.opcode = [&fields]
                     {
-                        switch (op)
+                        switch (fields.reg)
                         {
-                        case 0b000: return opcode::add_immediate_to_register_or_memory;
-                        case 0b101: return opcode::sub_immediate_from_register_or_memory;
-                        case 0b111: return opcode::cmp_immediate_with_register_or_memory;
-                        default:    return opcode::none;
+                            case 0b000: return opcode::add_immediate_to_register_or_memory;
+                            case 0b101: return opcode::sub_immediate_from_register_or_memory;
+                            case 0b111: return opcode::cmp_immediate_with_register_or_memory;
+                            default:    return opcode::none;
                         }
                     }();
                 }
@@ -673,7 +682,6 @@ namespace
             case opcode::mov_accumulator_to_memory:
             {
                 fields.w = b & 1;
-
                 read_data(data_iter, data_end, fields);
                 break;
             }
@@ -681,14 +689,7 @@ namespace
             case opcode::mov_to_segment_register:
             case opcode::mov_from_segment_register:
             {
-                read_and_advance(data_iter, data_end, b);
-
-                fields.rm = b & 0b111;
-                b >>= 3;
-                fields.sr = b & 0b11;
-                b >>= 3;
-                fields.mod = b;
-
+                read_follow_byte(data_iter, data_end, fields, b);
                 read_displacement(data_iter, data_end, fields);
                 break;
             }
@@ -713,8 +714,29 @@ namespace
             case opcode::loopz:
             case opcode::loopnz:
             case opcode::jcxz:
+            case opcode::jmp_direct:
+            case opcode::jmp_direct_short:
             {
-                read_and_advance(data_iter, data_end, fields.data_lo);
+                fields.w = (fields.opcode == opcode::jmp_direct);
+                read_data(data_iter, data_end, fields);
+                break;
+            }
+
+            case opcode::jmp_indirect:
+            {
+                read_follow_byte(data_iter, data_end, fields, b);
+
+                fields.opcode = [&fields]
+                {
+                    switch (fields.reg)
+                    {
+                        case 0b100: return opcode::jmp_indirect_near;
+                        case 0b101: return opcode::jmp_indirect_far;
+                        default:    return opcode::none;
+                    }
+                }();
+
+                read_displacement(data_iter, data_end, fields);
                 break;
             }
 
@@ -723,12 +745,13 @@ namespace
 
             default:
             case opcode::none:
+            {
                 const std::string error_message = "Unrecognized opcode while reading fields: " + std::to_string(static_cast<opcode_type>(fields.opcode));
                 throw std::exception{ error_message.c_str() };
+            }
         }
 
         const data_iterator final_position = data_iter;
-
         fields.size = static_cast<uint16_t>(std::distance(initial_position, final_position));
 
         return fields;
