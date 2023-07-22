@@ -44,7 +44,6 @@ namespace
         switch (width)
         {
             case simulator_numeric_width::byte:
-            default:
                 return
                 {
                     .min_signed = std::numeric_limits<int8_t>::min(),
@@ -70,6 +69,9 @@ namespace
                     .min_unsigned = 0,
                     .max_unsigned = 15
                 };
+
+            default:
+                throw std::exception{ "Unexpected numeric width type." };
         }
     }
 
@@ -130,6 +132,10 @@ namespace
                 const uint32_t term2_index = eae->term2.value().reg.index;
                 address += registers[term2_index];
             }
+        }
+        else
+        {
+            throw std::exception{ "Instruction operand type does not represent an address." };
         }
 
         return address;
@@ -243,6 +249,9 @@ simulation_step simulate_instruction(const instruction& inst)
 
                 break;
             }
+
+            default:
+                throw std::exception{ "Opcode does not support a register as the first operand." };
         }
 
         // write to registers
@@ -372,6 +381,8 @@ simulation_step simulate_instruction(const instruction& inst)
                     case operation_type::jcxz:
                         do_jump = registers[counter_register_index] == 0;
                         break;
+                    default:
+                        throw std::exception{ "Unexpected loop-related opcode." };
                 }
                 break;
             }
@@ -381,6 +392,9 @@ simulation_step simulate_instruction(const instruction& inst)
                 do_jump = true;
                 break;
             }
+
+            default:
+                throw std::exception{ "Opcode does not support an immediate as the first operand." };
         }
 
         if (do_jump)
@@ -422,8 +436,12 @@ simulation_step simulate_instruction(const instruction& inst)
             }
             
             default:
-                break;
+                throw std::exception{ "Opcode does not support an address as the first operand." };
         }
+    }
+    else
+    {
+        throw std::exception{ "The instruction's first operand had an unexpected type." };
     }
 
     registers[instruction_pointer_index] = new_ip;

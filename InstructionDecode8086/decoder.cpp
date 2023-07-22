@@ -294,8 +294,9 @@ namespace
             case 0b10: // memory mode, 16-bit displacement
                 return 2;
             case 0b11: // register mode, no displacement
-            default:
                 return 0;
+            default:
+                throw std::exception{ "Unexpected mod value." };
         }
     }
 
@@ -360,12 +361,13 @@ namespace
         switch (bytes)
         {
             case 0:
-            default:
                 return 0;
             case 1:
                 return static_cast<int8_t>(fields.disp_lo);
             case 2:
                 return static_cast<int16_t>((fields.disp_hi << 8) + fields.disp_lo);
+            default:
+                throw std::exception{ "Unexpected displacement byte count." };
         }
     }
 
@@ -374,12 +376,13 @@ namespace
         switch (bytes)
         {
             case 0:
-            default:
                 return 0;
             case 1:
                 return static_cast<uint8_t>(fields.disp_lo);
             case 2:
                 return static_cast<uint16_t>((fields.disp_hi << 8) + fields.disp_lo);
+            default:
+                throw std::exception{ "Unexpected direct address byte count." };
         }
     }
 
@@ -401,6 +404,8 @@ namespace
             case 0b10: // memory mode, 16-bit displacement
                 displacement_bytes = 2;
                 break;
+            default:
+                throw std::exception{ "Unexpected mod value.",  };
         }
         
         if (directAddress)
@@ -659,7 +664,7 @@ namespace
                             case 0b000: return opcode::add_immediate_to_register_or_memory;
                             case 0b101: return opcode::sub_immediate_from_register_or_memory;
                             case 0b111: return opcode::cmp_immediate_with_register_or_memory;
-                            default:    return opcode::none;
+                            default:    throw std::exception{ "Unexpected arithmetic op identifier." };
                         }
                     }();
                 }
@@ -732,7 +737,7 @@ namespace
                     {
                         case 0b100: return opcode::jmp_indirect_near;
                         case 0b101: return opcode::jmp_indirect_far;
-                        default:    return opcode::none;
+                        default:    throw std::exception{ "Unexpected indirect unconditional jump identifier." };
                     }
                 }();
 
