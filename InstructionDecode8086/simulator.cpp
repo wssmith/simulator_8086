@@ -398,7 +398,7 @@ simulation_step simulate_instruction(const instruction& inst)
             case operation_type::jmp:
             {
                 const uint16_t displacement_value = memory[address] + ((memory[address + 1] << 8) & 0xFF00);
-                step.new_ip += displacement_value;
+                step.new_ip = displacement_value;
                 break;
             }
             

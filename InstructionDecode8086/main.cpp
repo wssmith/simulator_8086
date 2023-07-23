@@ -277,7 +277,7 @@ int main(int argc, char* argv[])
         {
             constexpr int segment_size = 64 * 1024;
             constexpr auto cs_location = 0;
-            //constexpr auto cs_location = 64 * 4 * 63;
+            //constexpr auto cs_location = 65 * 4 * 64;
             //constexpr auto cs_location = memory.size() - segment_size;
 
             registers[code_segment_index] = cs_location >> 4;
