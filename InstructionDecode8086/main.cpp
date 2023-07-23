@@ -287,7 +287,7 @@ int main(int argc, char* argv[])
             if (data_buffer.size() > segment_size)
                 throw std::exception{ "Instructions must fit within a single memory segment." };
 
-            constexpr uint8_t* code_segment = memory.data() + cs_location;
+            uint8_t* code_segment = memory.data() + (registers[code_segment_index] << 4);
             data = std::span{ code_segment, data_buffer.size() };
             std::copy(data_buffer.cbegin(), data_buffer.cend(), data.begin());
         }

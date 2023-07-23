@@ -598,10 +598,7 @@ namespace
             case opcode::jmp_indirect_near:
             case opcode::jmp_indirect_far:
             {
-                inst.operands[0] = effective_address_expression
-                {
-                    // todo
-                };
+                inst.operands[0] = get_address_operand(fields);
                 break;
             }
 
@@ -729,6 +726,7 @@ namespace
 
             case opcode::jmp_indirect:
             {
+                fields.w = true;
                 read_follow_byte(data_iter, data_end, fields, b);
 
                 fields.opcode = [&fields]
