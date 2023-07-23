@@ -160,13 +160,6 @@ std::string get_flag_string(control_flags flags)
 
 simulation_step simulate_instruction(const instruction& inst)
 {
-    // update instruction pointer
-    const uint16_t old_ip = registers[instruction_pointer_index];
-    uint16_t new_ip = old_ip + static_cast<uint16_t>(inst.size);
-
-    const auto old_flags = control_flags{ registers[flags_index] };
-    control_flags new_flags = old_flags;
-
     auto source_matcher = overloaded
     {
         [](const effective_address_expression& eae) -> uint16_t
@@ -195,23 +188,24 @@ simulation_step simulate_instruction(const instruction& inst)
         [](std::monostate) -> uint16_t { return 0; }
     };
 
-    instruction_operand destination_op = inst.operands[0];
+    const instruction_operand destination_op = inst.operands[0];
     const uint16_t op_value = std::visit(source_matcher, inst.operands[1]);
 
     simulation_step step =
     {
-        .old_flags = old_flags,
-        .new_flags = new_flags,
-        .old_ip = old_ip,
-        .new_ip = new_ip,
+        .old_flags = control_flags{ registers[flags_index] },
+        .new_flags = control_flags{ registers[flags_index] },
+        .old_ip = registers[instruction_pointer_index],
+        .new_ip = static_cast<uint16_t>(registers[instruction_pointer_index] + inst.size)
     };
 
     if (const register_access* reg_destination = std::get_if<register_access>(&destination_op))
     {
-        const uint16_t old_value = registers[reg_destination->index];
-        uint16_t new_value = old_value;
+        step.destination = *reg_destination;
+        step.old_value = registers[reg_destination->index];
+        step.new_value = registers[reg_destination->index];
 
-        const auto old_value_signed = static_cast<int16_t>(old_value);
+        const auto old_value_signed = static_cast<int16_t>(step.old_value);
         const auto op_value_signed = static_cast<int16_t>(op_value);
         const bool wide_value = (reg_destination->count == 2);
 
@@ -222,13 +216,13 @@ simulation_step simulate_instruction(const instruction& inst)
                 if (reg_destination->count == 1)
                 {
                     if (reg_destination->offset == 0)
-                        new_value = (old_value & 0xFF) + (op_value << 8);
+                        step.new_value = (step.old_value & 0xFF) + (op_value << 8 & 0xFF00);
                     else
-                        new_value = (old_value & 0xFF00) + op_value;
+                        step.new_value = (step.old_value & 0xFF00) + op_value;
                 }
                 else
                 {
-                    new_value = op_value;
+                    step.new_value = op_value;
                 }
                 break;
             }
@@ -242,10 +236,10 @@ simulation_step simulate_instruction(const instruction& inst)
                 const bool is_addition = (inst.op == operation_type::add);
                 const int32_t result = is_addition ? old_value_signed + operand : old_value_signed - operand;
 
-                new_flags = compute_flags(old_value_signed, operand, result, wide_value, is_addition);
+                step.new_flags = compute_flags(old_value_signed, operand, result, wide_value, is_addition);
 
                 if (inst.op != operation_type::cmp)
-                    new_value = static_cast<uint16_t>(result);
+                    step.new_value = static_cast<uint16_t>(result);
 
                 break;
             }
@@ -255,91 +249,77 @@ simulation_step simulate_instruction(const instruction& inst)
         }
 
         // write to registers
-        registers[reg_destination->index] = new_value;
+        registers[reg_destination->index] = step.new_value;
 
         // update flags
-        registers[flags_index] = static_cast<uint16_t>(new_flags);
-
-        step = simulation_step
-        {
-            .destination = *reg_destination,
-            .old_value = old_value,
-            .new_value = new_value,
-            .old_flags = old_flags,
-            .new_flags = new_flags,
-            .old_ip = old_ip,
-            .new_ip = new_ip
-        };
+        registers[flags_index] = static_cast<uint16_t>(step.new_flags);
     }
     else if (const immediate* displacement = std::get_if<immediate>(&destination_op))
     {
-        auto reg_update = register_access
+        step.destination = register_access
         {
             .index = instruction_pointer_index,
             .offset = 0,
             .count = 2
         };
 
-        uint16_t old_value = 0;
-        uint16_t new_value = 0;
         bool do_jump = false;
-
         switch (inst.op)
         {
             case operation_type::je:
-                do_jump = has_any_flag(old_flags, control_flags::zero);
+                do_jump = has_any_flag(step.old_flags, control_flags::zero);
                 break;
             case operation_type::jne:
-                do_jump = !has_any_flag(old_flags, control_flags::zero);
+                do_jump = !has_any_flag(step.old_flags, control_flags::zero);
                 break;
 
             case operation_type::jl:
-                do_jump = has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow);
+                do_jump = has_any_flag(step.old_flags, control_flags::sign) ^ has_any_flag(step.old_flags, control_flags::overflow);
                 break;
             case operation_type::jnl:
-                do_jump = !(has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow));
+                do_jump = !(has_any_flag(step.old_flags, control_flags::sign) ^ has_any_flag(step.old_flags, control_flags::overflow));
                 break;
 
             case operation_type::jle:
-                do_jump = (has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow)) || has_any_flag(old_flags, control_flags::zero);
+                do_jump = (has_any_flag(step.old_flags, control_flags::sign) ^ has_any_flag(step.old_flags, control_flags::overflow)) || has_any_flag(step.old_flags, control_flags::zero);
                 break;
             case operation_type::jg:
-                do_jump = !(has_any_flag(old_flags, control_flags::sign) ^ has_any_flag(old_flags, control_flags::overflow)) || !has_any_flag(old_flags, control_flags::zero);
+                do_jump = !(has_any_flag(step.old_flags, control_flags::sign) ^ has_any_flag(step.old_flags, control_flags::overflow)) || !has_any_flag(step.old_flags, control_flags::zero);
                 break;
 
             case operation_type::jb:
-                do_jump = has_any_flag(old_flags, control_flags::carry);
+                do_jump = has_any_flag(step.old_flags, control_flags::carry);
                 break;
             case operation_type::jnb:
-                do_jump = !has_any_flag(old_flags, control_flags::carry);
+                do_jump = !has_any_flag(step.old_flags, control_flags::carry);
                 break;
 
             case operation_type::jbe:
-                do_jump = has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+                do_jump = has_any_flag(step.old_flags, control_flags::zero | control_flags::carry);
                 break;
             case operation_type::ja:
-                do_jump = !has_any_flag(old_flags, control_flags::zero | control_flags::carry);
+                do_jump = !has_any_flag(step.old_flags, control_flags::zero | control_flags::carry);
                 break;
 
             case operation_type::jp:
-                do_jump = has_any_flag(old_flags, control_flags::parity);
+                do_jump = has_any_flag(step.old_flags, control_flags::parity);
                 break;
             case operation_type::jnp:
-                do_jump = !has_any_flag(old_flags, control_flags::parity);
+                do_jump = !has_any_flag(step.old_flags, control_flags::parity);
                 break;
 
             case operation_type::jo:
-                do_jump = has_any_flag(old_flags, control_flags::overflow);
+                do_jump = has_any_flag(step.old_flags, control_flags::overflow);
                 break;
             case operation_type::jno:
-                do_jump = !has_any_flag(old_flags, control_flags::overflow);
+                do_jump = !has_any_flag(step.old_flags, control_flags::overflow);
                 break;
 
             case operation_type::js:
-                do_jump = has_any_flag(old_flags, control_flags::sign);
+                do_jump = has_any_flag(step.old_flags, control_flags::sign);
                 break;
             case operation_type::jns:
-                do_jump = !has_any_flag(old_flags, control_flags::sign);
+                do_jump = !has_any_flag(step.old_flags, control_flags::sign);
                 break;
 
             case operation_type::loopz:
@@ -347,36 +327,35 @@ simulation_step simulate_instruction(const instruction& inst)
             case operation_type::loop:
             case operation_type::jcxz:
             {
-                reg_update = register_access
+                step.destination = register_access
                 {
                     .index = counter_register_index,
                     .offset = 0,
                     .count = 2
                 };
 
-                old_value = registers[counter_register_index];
+                step.old_value = registers[counter_register_index];
 
                 if (inst.op == operation_type::jcxz)
                 {
-                    new_value = old_value;
+                    step.new_value = step.old_value;
                 }
                 else
                 {
-                    new_value = old_value - 1;
-                    registers[counter_register_index] = new_value;
+                    step.new_value = step.old_value - 1;
+                    registers[counter_register_index] = step.new_value;
                 }
 
-                do_jump = false;
                 switch (inst.op)
                 {
                     case operation_type::loopz:
-                        do_jump = new_value == 0 && has_any_flag(old_flags, control_flags::zero);
+                        do_jump = step.new_value == 0 && has_any_flag(step.old_flags, control_flags::zero);
                         break;
                     case operation_type::loopnz:
-                        do_jump = new_value != 0 && !has_any_flag(old_flags, control_flags::zero);
+                        do_jump = step.new_value != 0 && !has_any_flag(step.old_flags, control_flags::zero);
                         break;
                     case operation_type::loop:
-                        do_jump = new_value != 0;
+                        do_jump = step.new_value != 0;
                         break;
                     case operation_type::jcxz:
                         do_jump = registers[counter_register_index] == 0;
@@ -398,40 +377,28 @@ simulation_step simulate_instruction(const instruction& inst)
         }
 
         if (do_jump)
-            new_ip += displacement->value;
-
-        step = simulation_step
-        {
-            .destination = reg_update,
-            .old_value = old_value,
-            .new_value = new_value,
-            .old_ip = old_ip,
-            .new_ip = new_ip
-        };
+            step.new_ip += displacement->value;
     }
     else if (std::holds_alternative<direct_address>(destination_op) || std::holds_alternative<effective_address_expression>(destination_op))
     {
-        uint32_t address = get_address(destination_op);
+        const uint32_t address = get_address(destination_op);
 
         switch (inst.op)
         {
             case operation_type::mov:
             {
+                memory[address] = op_value & 0xFF;
+
                 if (has_any_flag(inst.flags, instruction_flags::wide))
-                {
-                    memory[address] = op_value & 0xFF;
-                    memory[address + 1] = (op_value >> 4) & 0xFF;
-                }
-                else
-                {
-                    memory[address] = op_value & 0xFF;
-                }
+                    memory[address + 1] = (op_value >> 8) & 0xFF;
+
                 break;
             }
 
             case operation_type::jmp:
             {
-                // todo
+                const uint16_t displacement_value = memory[address] + ((memory[address + 1] << 8) & 0xFF00);
+                step.new_ip += displacement_value;
                 break;
             }
             
@@ -439,12 +406,12 @@ simulation_step simulate_instruction(const instruction& inst)
                 throw std::exception{ "Opcode does not support an address as the first operand." };
         }
     }
-    else
+    else if (!std::holds_alternative<std::monostate>(destination_op))
     {
         throw std::exception{ "The instruction's first operand had an unexpected type." };
     }
 
-    registers[instruction_pointer_index] = new_ip;
+    registers[instruction_pointer_index] = step.new_ip;
 
     return step;
 }
