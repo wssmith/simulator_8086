@@ -9,6 +9,7 @@
 #include <iomanip>
 #include <iostream>
 #include <iterator>
+#include <ranges>
 #include <span>
 #include <sstream>
 #include <string>
@@ -64,12 +65,7 @@ namespace
         {
             [&inst](const effective_address_expression& address_op)
             {
-                std::string address_text;
-
-                if (std::holds_alternative<immediate>(inst.operands[1]))
-                    address_text += print_width(inst) + " ";
-
-                address_text += "["s + get_register_name(address_op.term1.reg);
+                std::string address_text = print_width(inst) + " ["s + get_register_name(address_op.term1.reg);
 
                 if (address_op.term2.has_value())
                     address_text += " + "s + get_register_name(address_op.term2.value().reg);
@@ -84,16 +80,12 @@ namespace
             },
             [&inst](direct_address direct_address_op)
             {
-                std::string direct_address_text;
-
-                if (std::holds_alternative<immediate>(inst.operands[1]))
-                    direct_address_text += print_width(inst) + " ";
-
-                direct_address_text += "[" + std::to_string(direct_address_op.address) + "]";
-
-                return direct_address_text;
+                return print_width(inst) + " [" + std::to_string(direct_address_op.address) + "]";
             },
-            [](const register_access& register_op) -> std::string { return get_register_name(register_op); },
+            [](const register_access& register_op) -> std::string
+            {
+                return get_register_name(register_op);
+            },
             [&inst](immediate immediate_op)
             {
                 if (has_any_flag(immediate_op.flags, immediate_flags::relative_jump_displacement))
@@ -237,7 +229,7 @@ int main(int argc, char* argv[])
     for (int i = 1; i < (argc - 1); ++i)
     {
         std::string option = argv[i];
-        std::transform(option.begin(), option.end(), option.begin(), [](char c) { return std::tolower(c); });
+        std::ranges::transform(option, option.begin(), [](char c) { return std::tolower(c); });
 
         if (valid_options.contains(option))
         {
@@ -289,7 +281,7 @@ int main(int argc, char* argv[])
 
             uint8_t* code_segment = memory.data() + (registers[code_segment_index] << 4);
             data = std::span{ code_segment, data_buffer.size() };
-            std::copy(data_buffer.cbegin(), data_buffer.cend(), data.begin());
+            std::ranges::copy(data_buffer, data.begin());
         }
         
         // read instructions
