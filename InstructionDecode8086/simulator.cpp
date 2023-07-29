@@ -3,6 +3,8 @@
 #include <bit>
 #include <cstdint>
 #include <limits>
+#include <map>
+#include <tuple>
 #include <unordered_map>
 #include <variant>
 
@@ -17,6 +19,31 @@ namespace
         register_access,
         memory,
         immediate
+    };
+
+    struct cycle_info
+    {
+        int32_t base_count{};
+        bool use_ea{};
+        int8_t ea_index{};
+    };
+
+    using cycle_map = std::map<std::tuple<operation_type, operand_type, operand_type>, cycle_info>;
+
+    cycle_map cycle_table
+    {
+        { { operation_type::mov, operand_type::memory, operand_type::register_access }, { .base_count = 10 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::register_access }, { .base_count = 2 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::memory }, { .base_count = 8, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::mov, operand_type::memory, operand_type::register_access }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::mov, operand_type::memory, operand_type::immediate }, { .base_count = 10, .use_ea = true, .ea_index = 0 } },
+        
+        { { operation_type::add, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
+        { { operation_type::add, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::add, operand_type::memory, operand_type::register_access }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::add, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::add, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } }
     };
 
     std::unordered_map<control_flags, char> flag_names
@@ -461,7 +488,31 @@ int32_t estimate_cycles(const instruction& inst)
     operand_type first_operand_type = get_operand_type(inst.operands[0]);
     operand_type second_operand_type = get_operand_type(inst.operands[1]);
 
-    // todo: create cycle estimation table
+    const auto [base_count, use_ea, ea_index] = cycle_table[{ opcode, first_operand_type, second_operand_type }];
 
-    return 0;
+    int cycle_count = base_count;
+    if (use_ea)
+    {
+        instruction_operand address_operand = inst.operands[ea_index];
+
+        auto matcher = overloaded
+        {
+            [](const effective_address_expression& eae)
+            {
+                return 0; // TODO
+            },
+            [](direct_address)
+            {
+                return 6;
+            },
+            [](register_access) { return 0; },
+            [](immediate) { return 0; },
+            [](std::monostate) { return 0; }
+        };
+
+        const auto ea_cycles = std::visit<int8_t>(matcher, address_operand);
+        cycle_count += ea_cycles;
+    }
+
+    return cycle_count;
 }
