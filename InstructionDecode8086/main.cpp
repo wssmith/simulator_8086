@@ -31,6 +31,7 @@ namespace
         const char* input_path = nullptr;
         bool execute_mode{};
         bool dump_memory{};
+        bool show_clocks{};
     };
 
     std::vector<uint8_t> read_binary_file(const std::string& path)
@@ -213,7 +214,7 @@ int main(int argc, char* argv[])
 {
     // read command line arguments
     constexpr int min_expected_args = 2;
-    constexpr const char* usage_message = "Usage: InstructionDecode8086 [-exec] [-dump] input_file";
+    constexpr const char* usage_message = "Usage: InstructionDecode8086 [-exec] [-dump] [-showclocks] input_file";
 
     if (argc < min_expected_args)
     {
@@ -223,7 +224,7 @@ int main(int argc, char* argv[])
 
     constexpr int not_found = -1;
     int invalid_option_index = not_found;
-    const std::unordered_set<std::string> valid_options = { "-exec", "-dump" };
+    const std::unordered_set<std::string> valid_options = { "-exec", "-dump", "-showclocks" };
 
     std::unordered_set<std::string> options;
     for (int i = 1; i < (argc - 1); ++i)
@@ -249,7 +250,8 @@ int main(int argc, char* argv[])
         {
             .input_path = argv[argc - 1],
             .execute_mode = options.contains("-exec"),
-            .dump_memory = options.contains("-dump")
+            .dump_memory = options.contains("-dump"),
+            .show_clocks = options.contains("-showclocks")
         };
     }
     else
@@ -258,12 +260,12 @@ int main(int argc, char* argv[])
         return EXIT_FAILURE;
     }
 
-    std::string input_filename = std::filesystem::path(app_args.input_path).filename().string();
-    const char* action = app_args.execute_mode ? "execution" : "decoding";
-    std::cout << "--- " << input_filename << " " << action << " --- \n\n";
-
     try
     {
+        std::string input_filename = std::filesystem::path(app_args.input_path).filename().string();
+        const char* action = app_args.execute_mode ? "execution" : "decoding";
+        std::cout << "--- " << input_filename << " " << action << " --- \n\n";
+
         // read binary instructions into a buffer, then copy its contents to the code segment in memory via a view
         std::span<uint8_t> data;
         {
@@ -289,6 +291,7 @@ int main(int argc, char* argv[])
         const auto data_end = data.end();
 
         uint32_t current_address = 0;
+        uint32_t total_cycles = 0;
 
         // decode instruction
         while (data_iter < data_end)
@@ -313,8 +316,16 @@ int main(int argc, char* argv[])
                     std::advance(data_iter, delta);
 
                 std::string sim_line = print_simulation_step(step);
+                std::cout << " ; ";
 
-                std::cout << " ; " << sim_line;
+                if (app_args.show_clocks)
+                {
+                    int32_t cycles = estimate_cycles(inst);
+                    total_cycles += cycles;
+                    std::cout << "Clocks: +" << cycles << " = " << total_cycles << " | ";
+                }
+
+                std::cout << sim_line;
             }
 
             std::cout << '\n';

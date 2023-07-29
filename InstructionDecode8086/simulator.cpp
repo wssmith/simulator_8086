@@ -11,6 +11,14 @@
 
 namespace
 {
+    enum class operand_type
+    {
+        none,
+        register_access,
+        memory,
+        immediate
+    };
+
     std::unordered_map<control_flags, char> flag_names
     {
         { control_flags::carry, 'C' },
@@ -21,7 +29,7 @@ namespace
         { control_flags::trap, 'T' },
         { control_flags::interrupt, 'I' },
         { control_flags::direction, 'D' },
-        { control_flags::overflow, 'O' },
+        { control_flags::overflow, 'O' }
     };
 
     struct simulator_numeric_limits
@@ -139,6 +147,28 @@ namespace
         }
 
         return address;
+    }
+
+    operand_type get_operand_type(const instruction_operand& operand)
+    {
+        auto matcher = overloaded
+        {
+            [](const effective_address_expression&) { return operand_type::memory; },
+            [](direct_address) { return operand_type::memory; },
+            [](register_access) { return operand_type::register_access; },
+            [](immediate) { return operand_type::immediate; },
+            [](std::monostate) { return operand_type::none; }
+        };
+
+        return std::visit(matcher, operand);
+    }
+
+    void store_value(uint16_t value, uint32_t address, const instruction_flags& flags)
+    {
+        memory[address] = value & 0xFF;
+
+        if (has_any_flag(flags, instruction_flags::wide))
+            memory[address + 1] = (value >> 8) & 0xFF;
     }
 }
 
@@ -387,11 +417,20 @@ simulation_step simulate_instruction(const instruction& inst)
         {
             case operation_type::mov:
             {
-                memory[address] = op_value & 0xFF;
+                store_value(op_value, address, inst.flags);
+                break;
+            }
+
+            case operation_type::add:
+            {
+                uint16_t existing_value = memory[address];
 
                 if (has_any_flag(inst.flags, instruction_flags::wide))
-                    memory[address + 1] = (op_value >> 8) & 0xFF;
+                    existing_value += (memory[address + 1] << 8) & 0xFF00;
 
+                const uint16_t new_value = existing_value + op_value;
+                
+                store_value(new_value, address, inst.flags);
                 break;
             }
 
@@ -414,4 +453,15 @@ simulation_step simulate_instruction(const instruction& inst)
     registers[instruction_pointer_index] = step.new_ip;
 
     return step;
+}
+
+int32_t estimate_cycles(const instruction& inst)
+{
+    operation_type opcode = inst.op;
+    operand_type first_operand_type = get_operand_type(inst.operands[0]);
+    operand_type second_operand_type = get_operand_type(inst.operands[1]);
+
+    // todo: create cycle estimation table
+
+    return 0;
 }
