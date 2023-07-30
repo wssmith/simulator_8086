@@ -59,7 +59,41 @@ namespace
         { { operation_type::add, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
         { { operation_type::add, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
 
-        { { operation_type::add, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } }
+        { { operation_type::add, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } },
+
+        { { operation_type::sub, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::register_access }, { .base_count = 3 } },
+        { { operation_type::sub, operand_type::register_access, operand_type::accumulator }, { .base_count = 3 } },
+
+        { { operation_type::sub, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+
+        { { operation_type::sub, operand_type::memory, operand_type::register_access }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::sub, operand_type::memory, operand_type::accumulator }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
+
+        { { operation_type::sub, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+
+        { { operation_type::sub, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } },
+
+        { { operation_type::cmp, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::register_access }, { .base_count = 3 } },
+        { { operation_type::cmp, operand_type::register_access, operand_type::accumulator }, { .base_count = 3 } },
+
+        { { operation_type::cmp, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+
+        { { operation_type::cmp, operand_type::memory, operand_type::register_access }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::cmp, operand_type::memory, operand_type::accumulator }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
+
+        { { operation_type::cmp, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+
+        { { operation_type::cmp, operand_type::memory, operand_type::immediate }, { .base_count = 10, .use_ea = true, .ea_index = 0 } },
+
+        { { operation_type::nop, operand_type::none, operand_type::none }, { .base_count = 3 } }
     };
 
     // bx, bp, si, di, disp
