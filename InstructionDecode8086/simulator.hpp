@@ -4,7 +4,6 @@
 #include <array>
 #include <cstdint>
 #include <string>
-#include <type_traits>
 
 #include "flag_utils.hpp"
 #include "register_access.hpp"

@@ -2,7 +2,6 @@
 #define WS_REGISTERACCESS_HPP
 
 #include <cstdint>
-#include <type_traits>
 
 #include "flag_utils.hpp"
 

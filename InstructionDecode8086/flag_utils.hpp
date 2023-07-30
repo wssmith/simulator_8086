@@ -1,6 +1,8 @@
 ﻿#ifndef WS_FLAGUTILS_HPP
 #define WS_FLAGUTILS_HPP
 
+#include <type_traits>
+
 template<typename TFlags>
 constexpr bool has_any_flag(TFlags flags, TFlags select_flags)
 {
