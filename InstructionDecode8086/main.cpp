@@ -27,6 +27,8 @@ namespace
 {
     using namespace std::string_literals;
 
+    memory_array memory = {};
+
     struct sim86_arguments
     {
         const char* input_path = nullptr;
@@ -186,7 +188,7 @@ namespace
         return stream.str();
     }
 
-    std::string print_register_contents()
+    std::string print_register_contents(const register_array& registers)
     {
         std::ostringstream builder;
 
@@ -284,6 +286,8 @@ int main(int argc, char* argv[])
         const char* action = app_args.execute_mode ? "execution" : "decoding";
         std::cout << "--- " << input_filename << " " << action << " --- \n\n";
 
+        register_array registers = {};
+
         // read binary instructions into a buffer, then copy its contents to the code segment in memory via a view
         std::span<uint8_t> data;
         {
@@ -326,7 +330,7 @@ int main(int argc, char* argv[])
             // execute instruction?
             if (app_args.execute_mode)
             {
-                simulation_step step = simulate_instruction(inst);
+                simulation_step step = simulate_instruction(inst, registers, memory);
 
                 const int32_t actual_ip_change = step.new_ip - step.old_ip;
                 const int32_t delta = (actual_ip_change - static_cast<int32_t>(inst.size));
@@ -355,7 +359,7 @@ int main(int argc, char* argv[])
         if (app_args.execute_mode)
         {
             // print final contents of registers
-            const std::string register_contents = print_register_contents();
+            const std::string register_contents = print_register_contents(registers);
             std::cout << "\nFinal registers:\n" << register_contents;
 
             if (app_args.dump_memory)

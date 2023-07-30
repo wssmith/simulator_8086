@@ -116,7 +116,7 @@ namespace
         return new_flags;
     }
 
-    uint32_t get_address(const instruction_operand& destination_op)
+    uint32_t get_address(const instruction_operand& destination_op, const register_array& registers)
     {
         uint32_t address{};
 
@@ -143,7 +143,7 @@ namespace
         return address;
     }
 
-    void store_value(uint16_t value, uint32_t address, const instruction_flags& flags)
+    void store_value(uint16_t value, uint32_t address, const instruction_flags& flags, memory_array& memory)
     {
         memory[address] = value & 0xFF;
 
@@ -168,11 +168,11 @@ std::string get_flag_string(control_flags flags)
     return flag_string;
 }
 
-simulation_step simulate_instruction(const instruction& inst)
+simulation_step simulate_instruction(const instruction& inst, register_array& registers, memory_array& memory)
 {
     auto source_matcher = overloaded
     {
-        [](const effective_address_expression& eae) -> uint16_t
+        [&registers, &memory](const effective_address_expression& eae) -> uint16_t
         {
             int32_t address = registers[eae.term1.reg.index] + eae.displacement;
 
@@ -181,8 +181,8 @@ simulation_step simulate_instruction(const instruction& inst)
 
             return memory[address];
         },
-        [](direct_address address) -> uint16_t { return memory[address.address]; },
-        [](register_access operand) -> uint16_t
+        [&memory](direct_address address) -> uint16_t { return memory[address.address]; },
+        [&registers](register_access operand) -> uint16_t
         {
             if (operand.count == 1)
             {
@@ -391,13 +391,13 @@ simulation_step simulate_instruction(const instruction& inst)
     }
     else if (std::holds_alternative<direct_address>(destination_op) || std::holds_alternative<effective_address_expression>(destination_op))
     {
-        const uint32_t address = get_address(destination_op);
+        const uint32_t address = get_address(destination_op, registers);
 
         switch (inst.op)
         {
             case operation_type::mov:
             {
-                store_value(op_value, address, inst.flags);
+                store_value(op_value, address, inst.flags, memory);
                 break;
             }
 
@@ -410,7 +410,7 @@ simulation_step simulate_instruction(const instruction& inst)
 
                 const uint16_t new_value = existing_value + op_value;
                 
-                store_value(new_value, address, inst.flags);
+                store_value(new_value, address, inst.flags, memory);
                 break;
             }
 
