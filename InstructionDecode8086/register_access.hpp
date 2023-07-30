@@ -44,8 +44,8 @@ enum class register_types : uint32_t
 
 FLAG_OPERATIONS(register_types);
 
-char const* get_register_name(const register_access& reg_access);
+char const* get_register_name(register_access reg_access);
 
-register_types get_register_types(const register_access& reg_access);
+register_types get_register_types(register_access reg_access);
 
 #endif

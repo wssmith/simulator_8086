@@ -84,7 +84,7 @@ namespace
             {
                 return print_width(inst) + " [" + std::to_string(direct_address_op.address) + "]";
             },
-            [](const register_access& register_op) -> std::string
+            [](register_access register_op) -> std::string
             {
                 return get_register_name(register_op);
             },
@@ -167,6 +167,23 @@ namespace
         }
 
         return builder.str();
+    }
+
+    std::string print_cycle_estimate(int32_t current_cycles, int32_t base, int32_t ea, uint32_t total_cycles)
+    {
+        constexpr int column_width = 28;
+        std::ostringstream stream;
+        std::ostringstream builder;
+
+        builder << "Clocks: +" << current_cycles << " = " << total_cycles;
+
+        if (ea != 0)
+            builder << " (" << base << " + " << ea << "ea)";
+
+        stream << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
+        stream << builder.str();
+
+        return stream.str();
     }
 
     std::string print_register_contents()
@@ -292,7 +309,7 @@ int main(int argc, char* argv[])
         const auto data_end = data.end();
 
         uint32_t current_address = 0;
-        uint32_t total_cycles = 0;
+        int32_t total_cycles = 0;
 
         // decode instruction
         while (data_iter < data_end)
@@ -301,7 +318,7 @@ int main(int argc, char* argv[])
             current_address += inst.size;
 
             // print instruction
-            constexpr int column_width = 22;
+            constexpr int column_width = 24;
             std::string asm_line = print_instruction(inst);
             std::cout << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
             std::cout << asm_line;
@@ -316,7 +333,6 @@ int main(int argc, char* argv[])
                 if (delta != 0)
                     std::advance(data_iter, delta);
 
-                std::string sim_line = print_simulation_step(step);
                 std::cout << " ; ";
 
                 if (app_args.show_clocks)
@@ -325,14 +341,11 @@ int main(int argc, char* argv[])
                     int32_t current_cycles = base + ea;
                     total_cycles += current_cycles;
 
-                    std::cout << "Clocks: +" << current_cycles << " = " << total_cycles;
-
-                    if (ea != 0)
-                        std::cout << " (" << base << " + " << ea << "ea)";
-
-                    std::cout << " | ";
+                    std::string cycle_line = print_cycle_estimate(current_cycles, base, ea, total_cycles);
+                    std::cout << cycle_line << " | ";
                 }
 
+                std::string sim_line = print_simulation_step(step);
                 std::cout << sim_line;
             }
 

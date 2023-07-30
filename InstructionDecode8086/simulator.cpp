@@ -182,7 +182,7 @@ simulation_step simulate_instruction(const instruction& inst)
             return memory[address];
         },
         [](direct_address address) -> uint16_t { return memory[address.address]; },
-        [](const register_access& operand) -> uint16_t
+        [](register_access operand) -> uint16_t
         {
             if (operand.count == 1)
             {

@@ -41,12 +41,12 @@ namespace
     };
 }
 
-char const* get_register_name(const register_access& reg_access)
+char const* get_register_name(register_access reg_access)
 {
     return registers[reg_access.index][reg_access.offset + (reg_access.count == 1)];
 }
 
-register_types get_register_types(const register_access& reg_access)
+register_types get_register_types(register_access reg_access)
 {
     return register_type_table[reg_access.index][reg_access.offset + (reg_access.count == 1)];
 }
