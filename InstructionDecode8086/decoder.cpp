@@ -10,24 +10,6 @@
 
 namespace
 {
-    constexpr std::array registers =
-    {
-        std::array{ "ax", "ah", "al" },
-        std::array{ "bx", "bh", "bl" },
-        std::array{ "cx", "ch", "cl" },
-        std::array{ "dx", "dh", "dl" },
-        std::array{ "sp", "sp", "sp" },
-        std::array{ "bp", "bp", "bp" },
-        std::array{ "si", "si", "si" },
-        std::array{ "di", "di", "di" },
-        std::array{ "cs", "cs", "cs" },
-        std::array{ "ds", "ds", "ds" },
-        std::array{ "ss", "ss", "ss" },
-        std::array{ "es", "es", "es" },
-        std::array{ "ip", "ip", "ip" },
-        std::array{ "flags", "flags", "flags" }
-    };
-
     constexpr std::array<uint8_t, 16> register_index_map =
     {
         0, 2, 3, 1, 0, 2, 3, 1, 0, 2, 3, 1, 4, 5, 6, 7

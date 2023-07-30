@@ -27,6 +27,12 @@
     <ClCompile Include="flag_utils.hpp">
       <Filter>Header Files</Filter>
     </ClCompile>
+    <ClCompile Include="register_access.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cycle_estimator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="decoder.hpp">
@@ -42,6 +48,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="register_access.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cycle_estimator.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

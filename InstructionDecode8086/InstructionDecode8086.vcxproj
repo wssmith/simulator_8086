@@ -130,12 +130,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="cycle_estimator.cpp" />
     <ClCompile Include="decoder.cpp" />
     <ClCompile Include="flag_utils.hpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="register_access.cpp" />
     <ClCompile Include="simulator.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="cycle_estimator.hpp" />
     <ClInclude Include="decoder.hpp" />
     <ClInclude Include="overloaded.hpp" />
     <ClInclude Include="register_access.hpp" />

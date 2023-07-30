@@ -54,6 +54,4 @@ std::string get_flag_string(control_flags flags);
 
 simulation_step simulate_instruction(const instruction& inst);
 
-int32_t estimate_cycles(const instruction& inst);
-
 #endif

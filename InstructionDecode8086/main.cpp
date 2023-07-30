@@ -16,6 +16,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "cycle_estimator.hpp"
 #include "flag_utils.hpp"
 #include "decoder.hpp"
 #include "overloaded.hpp"
@@ -69,7 +70,7 @@ namespace
                 std::string address_text = print_width(inst) + " ["s + get_register_name(address_op.term1.reg);
 
                 if (address_op.term2.has_value())
-                    address_text += " + "s + get_register_name(address_op.term2.value().reg);
+                    address_text += " + "s + get_register_name(address_op.term2->reg);
 
                 if (address_op.displacement > 0)
                     address_text += " + " + std::to_string(address_op.displacement);
@@ -320,9 +321,16 @@ int main(int argc, char* argv[])
 
                 if (app_args.show_clocks)
                 {
-                    int32_t cycles = estimate_cycles(inst);
-                    total_cycles += cycles;
-                    std::cout << "Clocks: +" << cycles << " = " << total_cycles << " | ";
+                    auto [base, ea] = estimate_cycles(inst);
+                    int32_t current_cycles = base + ea;
+                    total_cycles += current_cycles;
+
+                    std::cout << "Clocks: +" << current_cycles << " = " << total_cycles;
+
+                    if (ea != 0)
+                        std::cout << " (" << base << " + " << ea << "ea)";
+
+                    std::cout << " | ";
                 }
 
                 std::cout << sim_line;
