@@ -341,7 +341,10 @@ int main(int argc, char* argv[])
 
                 if (app_args.show_clocks)
                 {
-                    auto [base, ea] = estimate_cycles(inst);
+                    const cycle_estimate estimate = estimate_cycles(inst);
+                    const int32_t base = (estimate.base.min + estimate.base.max) / 2;
+                    const int32_t ea = estimate.ea;
+
                     int32_t current_cycles = base + ea;
                     total_cycles += current_cycles;
 

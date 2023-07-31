@@ -21,6 +21,7 @@ namespace
     struct cycle_info
     {
         int32_t base_count{};
+        int32_t transfers{};
         bool use_ea{};
         int8_t ea_index{};
     };
@@ -29,71 +30,71 @@ namespace
 
     cycle_map cycle_table
     {
-        { { operation_type::mov, operand_type::memory, operand_type::accumulator }, { .base_count = 10 } },
-        { { operation_type::mov, operand_type::accumulator, operand_type::memory }, { .base_count = 10 } },
+        { { operation_type::mov, operand_type::memory, operand_type::accumulator }, { .base_count = 10, .transfers = 1 } },
+        { { operation_type::mov, operand_type::accumulator, operand_type::memory }, { .base_count = 10, .transfers = 1 } },
 
-        { { operation_type::mov, operand_type::register_access, operand_type::register_access }, { .base_count = 2 } },
-        { { operation_type::mov, operand_type::accumulator, operand_type::accumulator }, { .base_count = 2 } },
-        { { operation_type::mov, operand_type::accumulator, operand_type::register_access }, { .base_count = 2 } },
-        { { operation_type::mov, operand_type::register_access, operand_type::accumulator }, { .base_count = 2 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::register_access }, { .base_count = 2, .transfers = 0 } },
+        { { operation_type::mov, operand_type::accumulator, operand_type::accumulator }, { .base_count = 2, .transfers = 0 } },
+        { { operation_type::mov, operand_type::accumulator, operand_type::register_access }, { .base_count = 2, .transfers = 0 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::accumulator }, { .base_count = 2, .transfers = 0 } },
 
-        { { operation_type::mov, operand_type::register_access, operand_type::memory }, { .base_count = 8, .use_ea = true, .ea_index = 1 } },
-        { { operation_type::mov, operand_type::memory, operand_type::register_access }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::memory }, { .base_count = 8, .transfers = 1, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::mov, operand_type::memory, operand_type::register_access }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::mov, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
-        { { operation_type::mov, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::mov, operand_type::register_access, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
+        { { operation_type::mov, operand_type::accumulator, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
 
-        { { operation_type::mov, operand_type::memory, operand_type::immediate }, { .base_count = 10, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::mov, operand_type::memory, operand_type::immediate }, { .base_count = 10, .transfers = 1, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::add, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::add, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3 } },
-        { { operation_type::add, operand_type::accumulator, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::add, operand_type::register_access, operand_type::accumulator }, { .base_count = 3 } },
+        { { operation_type::add, operand_type::register_access, operand_type::register_access }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::add, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3, .transfers = 0  } },
+        { { operation_type::add, operand_type::accumulator, operand_type::register_access }, { .base_count = 3, .transfers = 0  } },
+        { { operation_type::add, operand_type::register_access, operand_type::accumulator }, { .base_count = 3, .transfers = 0  } },
 
-        { { operation_type::add, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
-        { { operation_type::add, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::add, operand_type::register_access, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::add, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
 
-        { { operation_type::add, operand_type::memory, operand_type::register_access }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
-        { { operation_type::add, operand_type::memory, operand_type::accumulator }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::add, operand_type::memory, operand_type::register_access }, { .base_count = 16, .transfers = 2, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::add, operand_type::memory, operand_type::accumulator }, { .base_count = 16, .transfers = 2, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::add, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
-        { { operation_type::add, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::add, operand_type::register_access, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
+        { { operation_type::add, operand_type::accumulator, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
 
-        { { operation_type::add, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::add, operand_type::memory, operand_type::immediate }, { .base_count = 17, .transfers = 2, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::sub, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::sub, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3 } },
-        { { operation_type::sub, operand_type::accumulator, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::sub, operand_type::register_access, operand_type::accumulator }, { .base_count = 3 } },
+        { { operation_type::sub, operand_type::register_access, operand_type::register_access }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::register_access }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::sub, operand_type::register_access, operand_type::accumulator }, { .base_count = 3, .transfers = 0 } },
 
-        { { operation_type::sub, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
-        { { operation_type::sub, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::sub, operand_type::register_access, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
 
-        { { operation_type::sub, operand_type::memory, operand_type::register_access }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
-        { { operation_type::sub, operand_type::memory, operand_type::accumulator }, { .base_count = 16, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::sub, operand_type::memory, operand_type::register_access }, { .base_count = 16, .transfers = 2, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::sub, operand_type::memory, operand_type::accumulator }, { .base_count = 16, .transfers = 2, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::sub, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
-        { { operation_type::sub, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::sub, operand_type::register_access, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
+        { { operation_type::sub, operand_type::accumulator, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
 
-        { { operation_type::sub, operand_type::memory, operand_type::immediate }, { .base_count = 17, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::sub, operand_type::memory, operand_type::immediate }, { .base_count = 17, .transfers = 2, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::cmp, operand_type::register_access, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::cmp, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3 } },
-        { { operation_type::cmp, operand_type::accumulator, operand_type::register_access }, { .base_count = 3 } },
-        { { operation_type::cmp, operand_type::register_access, operand_type::accumulator }, { .base_count = 3 } },
+        { { operation_type::cmp, operand_type::register_access, operand_type::register_access }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::accumulator }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::register_access }, { .base_count = 3, .transfers = 0 } },
+        { { operation_type::cmp, operand_type::register_access, operand_type::accumulator }, { .base_count = 3, .transfers = 0 } },
 
-        { { operation_type::cmp, operand_type::register_access, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
-        { { operation_type::cmp, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::cmp, operand_type::register_access, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::memory }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 1 } },
 
-        { { operation_type::cmp, operand_type::memory, operand_type::register_access }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
-        { { operation_type::cmp, operand_type::memory, operand_type::accumulator }, { .base_count = 9, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::cmp, operand_type::memory, operand_type::register_access }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::cmp, operand_type::memory, operand_type::accumulator }, { .base_count = 9, .transfers = 1, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::cmp, operand_type::register_access, operand_type::immediate }, { .base_count = 4 } },
-        { { operation_type::cmp, operand_type::accumulator, operand_type::immediate }, { .base_count = 4 } },
+        { { operation_type::cmp, operand_type::register_access, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
+        { { operation_type::cmp, operand_type::accumulator, operand_type::immediate }, { .base_count = 4, .transfers = 0 } },
 
-        { { operation_type::cmp, operand_type::memory, operand_type::immediate }, { .base_count = 10, .use_ea = true, .ea_index = 0 } },
+        { { operation_type::cmp, operand_type::memory, operand_type::immediate }, { .base_count = 10, .transfers = 1, .use_ea = true, .ea_index = 0 } },
 
-        { { operation_type::nop, operand_type::none, operand_type::none }, { .base_count = 3 } }
+        { { operation_type::nop, operand_type::none, operand_type::none }, { .base_count = 3, .transfers = 0 } }
     };
 
     // bx, bp, si, di, disp
@@ -163,7 +164,7 @@ cycle_estimate estimate_cycles(const instruction& inst)
     if (!cycle_table.contains(cycle_key))
         throw std::exception{ "Unexpected instruction for cycle estimation." };
 
-    const auto [base_cycles, use_ea, ea_index] = cycle_table[cycle_key];
+    const auto [base_cycles, transfers, use_ea, ea_index] = cycle_table[cycle_key];
 
     int8_t ea_cycles = 0;
     if (use_ea)
@@ -205,7 +206,8 @@ cycle_estimate estimate_cycles(const instruction& inst)
 
     return cycle_estimate
     {
-        .base = base_cycles,
+        .base = { .min = base_cycles, .max = base_cycles },
+        .transfers = transfers,
         .ea = ea_cycles
     };
 }
