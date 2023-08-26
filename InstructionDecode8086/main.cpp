@@ -254,7 +254,7 @@ int main(int argc, char* argv[])
 
         if (valid_options.contains(option))
         {
-            options.emplace(option);
+            options.insert(option);
         }
         else
         {
