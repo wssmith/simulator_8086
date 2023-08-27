@@ -377,10 +377,12 @@ int main(int argc, char* argv[])
     catch (std::exception& ex)
     {
         std::cout << "ERROR!! " << ex.what() << '\n';
+        return EXIT_FAILURE;
     }
     catch (...)
     {
         std::cout << "UNKNOWN ERROR!!\n";
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
