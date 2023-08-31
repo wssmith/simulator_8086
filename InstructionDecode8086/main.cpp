@@ -220,7 +220,7 @@ namespace
 
     void save_memory_dump(const char* path, const memory_array& memory_dump)
     {
-        std::ofstream output_stream { path, std::ios::binary };
+        std::ofstream output_stream{ path, std::ios::binary };
 
         for (const uint8_t b : memory_dump)
             output_stream << b;
