@@ -218,15 +218,14 @@ namespace
         return builder.str();
     }
 
-    void save_memory_dump(const char* filename)
+    void save_memory_dump(const char* path, const memory_array& memory_dump)
     {
-        std::ofstream memory_dump;
-        memory_dump.open(filename, std::ios::out | std::ios::binary);
+        std::ofstream output_stream { path, std::ios::binary };
 
-        for (const uint8_t b : memory)
-            memory_dump << b;
+        for (const uint8_t b : memory_dump)
+            output_stream << b;
 
-        memory_dump.close();
+        output_stream.close();
     }
 }
 
@@ -369,7 +368,7 @@ int main(int argc, char* argv[])
             {
                 // save memory to a file
                 constexpr auto dump_filename = "dump.data";
-                save_memory_dump(dump_filename);
+                save_memory_dump(dump_filename, memory);
                 std::cout << "\nSaved memory to '" << dump_filename << "'.\n";
             }
         }
