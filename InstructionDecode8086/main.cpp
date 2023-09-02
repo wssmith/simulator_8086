@@ -5,7 +5,6 @@
 #include <exception>
 #include <filesystem>
 #include <fstream>
-#include <ios>
 #include <iomanip>
 #include <iostream>
 #include <iterator>
@@ -41,7 +40,7 @@ namespace
     {
         std::vector<uint8_t> data;
 
-        std::ifstream input_file{ path, std::ios::in | std::ios::binary };
+        std::ifstream input_file{ path, std::ios::binary };
 
         if (!input_file.is_open())
             throw std::exception{ "Cannot open binary file." };
@@ -221,6 +220,9 @@ namespace
     void save_memory_dump(const char* path, const memory_array& memory_dump)
     {
         std::ofstream output_stream{ path, std::ios::binary };
+
+        if (!output_stream.is_open())
+            throw std::exception{ "Cannot write to memory dump file." };
 
         for (const uint8_t b : memory_dump)
             output_stream << b;
