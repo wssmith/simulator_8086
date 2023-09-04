@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
+#include <format>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -42,7 +43,7 @@ namespace
 
         std::ifstream input_file{ path, std::ios::binary };
 
-        if (!input_file.is_open())
+        if (!input_file)
             throw std::exception{ "Cannot open binary file." };
 
         std::for_each(std::istreambuf_iterator(input_file),
@@ -83,7 +84,7 @@ namespace
             },
             [&inst](direct_address direct_address_op)
             {
-                return print_width(inst) + " [" + std::to_string(direct_address_op.address) + "]";
+                return std::vformat("{} [{}]", std::make_format_args(print_width(inst), direct_address_op.address));
             },
             [](register_access register_op) -> std::string
             {
@@ -94,7 +95,7 @@ namespace
                 if (has_any_flag(immediate_op.flags, immediate_flags::relative_jump_displacement))
                 {
                     const int32_t value = immediate_op.value + static_cast<int32_t>(inst.size);
-                    return "$" + (value >= 0 ? "+" + std::to_string(value) : "-" + std::to_string(-value));
+                    return std::vformat("${:+}", std::make_format_args(value));
                 }
 
                 if (has_any_flag(inst.flags, instruction_flags::wide))
@@ -120,17 +121,14 @@ namespace
 
     void print_state_transition(std::ostringstream& stream, const char* destination_register, int width, uint16_t old_value, uint16_t new_value)
     {
-        std::ostringstream builder;
-        builder << destination_register << ":0x" << std::hex << old_value << "->0x" << new_value << std::dec;
-
         stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
-        stream << builder.str();
+        stream << std::vformat("{}:{:#x}->{:#x}", std::make_format_args(destination_register, old_value, new_value));
     }
 
     void print_flags_transition(std::ostringstream& stream, const char* flag_register, int width, const simulation_step& step)
     {
         stream << std::left << std::setw(width) << std::fixed << std::setfill(' ');
-        stream << flag_register + ":"s + get_flag_string(step.old_flags) + "->" + get_flag_string(step.new_flags);
+        stream << std::vformat("{}:{}->{}", std::make_format_args(flag_register, get_flag_string(step.old_flags), get_flag_string(step.new_flags)));
     }
 
     void print_literal(std::ostringstream& stream, const char* literal, int width)
@@ -172,17 +170,14 @@ namespace
 
     std::string print_cycle_estimate(int32_t current_cycles, int32_t base, int32_t ea, uint32_t total_cycles)
     {
+        std::string estimate = std::vformat("Clocks: {:+} = {}", std::make_format_args(current_cycles, total_cycles));
+        if (ea != 0)
+            estimate += std::vformat(" ({} + {}ea)", std::make_format_args(base, ea));
+
         constexpr int column_width = 28;
         std::ostringstream stream;
-        std::ostringstream builder;
-
-        builder << "Clocks: +" << current_cycles << " = " << total_cycles;
-
-        if (ea != 0)
-            builder << " (" << base << " + " << ea << "ea)";
-
         stream << std::left << std::setw(column_width) << std::fixed << std::setfill(' ');
-        stream << builder.str();
+        stream << estimate;
 
         return stream.str();
     }
@@ -203,14 +198,11 @@ namespace
             if (i == flags_index)
             {
                 const auto flags = control_flags{ registers[flags_index] };
-
-                builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
-                builder << register_name << ": " << get_flag_string(flags) << '\n';
+                builder << std::vformat("{0: >8}: {1}\n", std::make_format_args(register_name, get_flag_string(flags)));
             }
             else
             {
-                builder << std::right << std::setw(8) << std::fixed << std::setfill(' ');
-                builder << register_name << ": 0x" << std::hex << std::setfill('0') << std::setw(4) << reg_value << std::dec << std::setw(0) << " (" << reg_value << ")\n";
+                builder << std::vformat("{0: >8}: {1:#06x} ({1:d})\n", std::make_format_args(register_name, reg_value));
             }
         }
 
@@ -221,7 +213,7 @@ namespace
     {
         std::ofstream output_stream{ path, std::ios::binary };
 
-        if (!output_stream.is_open())
+        if (!output_stream)
             throw std::exception{ "Cannot write to memory dump file." };
 
         for (const uint8_t b : memory_dump)
