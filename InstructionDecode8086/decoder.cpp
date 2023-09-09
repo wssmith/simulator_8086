@@ -284,7 +284,7 @@ namespace
 
     void read_and_advance(data_iterator& iter, const data_iterator& iter_end, uint8_t& b)
     {
-        if (iter == iter_end)
+        if (iter >= iter_end)
             throw std::exception{ "Cannot dereference out-of-range iterator for binary data." };
         
         b = *iter++;
