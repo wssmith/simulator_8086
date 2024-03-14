@@ -99,16 +99,16 @@ namespace
 
         const auto existing_unsigned = static_cast<uint16_t>(existing);
         const auto operand_unsigned = static_cast<uint16_t>(operand);
-        const auto result_unsigned = is_addition ? (existing_unsigned + operand_unsigned) : (existing_unsigned - operand_unsigned);
+        const int32_t result_unsigned = is_addition ? (existing_unsigned + operand_unsigned) : (existing_unsigned - operand_unsigned);
 
         if (result_unsigned > limits.max_unsigned || result_unsigned < limits.min_unsigned)
             new_flags |= control_flags::carry;
 
         constexpr auto aux_limits = get_numeric_limits(simulator_numeric_width::nibble);
 
-        const auto existing_nibble = existing & 0xF;
-        const auto operand_nibble = operand & 0xF;
-        const auto result_nibble = is_addition ? (existing_nibble + operand_nibble) : (existing_nibble - operand_nibble);
+        const int32_t existing_nibble = existing & 0xF;
+        const int32_t operand_nibble = operand & 0xF;
+        const int32_t result_nibble = is_addition ? (existing_nibble + operand_nibble) : (existing_nibble - operand_nibble);
 
         if (result_nibble > aux_limits.max_unsigned || result_nibble < aux_limits.min_unsigned)
             new_flags |= control_flags::aux_carry;
